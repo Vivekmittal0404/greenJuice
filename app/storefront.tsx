@@ -1,11 +1,16 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import {
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+} from "react";
 import {
   ArrowDown,
   Check,
   ChevronRight,
   Clock3,
+  ClipboardList,
   Leaf,
   Minus,
   Plus,
@@ -29,11 +34,63 @@ type Product = {
 
 type CreatedOrder = {
   orderId: string;
-  paymentLink: string;
-  upiId: string;
   amount: number;
   notificationWarning?: string;
+} & (
+  | { paymentMethod: "upi"; paymentLink: string; upiId: string }
+  | { paymentMethod: "cod" }
+);
+
+type SavedOrder = {
+  orderId: string;
+  amount: number;
+  paymentMethod: "upi" | "cod";
+  items: Array<{ id: string; quantity: number }>;
+  createdAt: string;
 };
+
+const CART_STORAGE_KEY = "root-ritual-cart-v1";
+const ORDERS_STORAGE_KEY = "root-ritual-orders-v1";
+const STORAGE_UNAVAILABLE = "__root_ritual_storage_unavailable__";
+
+function subscribeToStorage(key: string, callback: () => void) {
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === key || event.key === null) callback();
+  };
+  const changeEvent = `${key}-changed`;
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(changeEvent, callback);
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(changeEvent, callback);
+  };
+}
+
+function getStorageSnapshot(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return STORAGE_UNAVAILABLE;
+  }
+}
+
+function writeStorageValue(key: string, value: string): boolean {
+  try {
+    window.localStorage.setItem(key, value);
+    window.dispatchEvent(new Event(`${key}-changed`));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const subscribeToCart = (callback: () => void) =>
+  subscribeToStorage(CART_STORAGE_KEY, callback);
+const subscribeToOrders = (callback: () => void) =>
+  subscribeToStorage(ORDERS_STORAGE_KEY, callback);
+const getCartSnapshot = () => getStorageSnapshot(CART_STORAGE_KEY);
+const getOrdersSnapshot = () => getStorageSnapshot(ORDERS_STORAGE_KEY);
+const getServerSnapshot = () => null;
 
 const products: Product[] = [
   {
@@ -71,14 +128,128 @@ const formatPrice = (amount: number) =>
     maximumFractionDigits: 0,
   }).format(amount);
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readSavedCart(snapshot: string | null): {
+  value: Record<string, number>;
+  warning: string;
+} {
+  if (snapshot === null) return { value: {}, warning: "" };
+  if (snapshot === STORAGE_UNAVAILABLE) {
+    return {
+      value: {},
+      warning: "Browser storage is unavailable; your bag cannot be saved.",
+    };
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(snapshot);
+    if (!isRecord(parsed)) throw new Error("Invalid saved bag.");
+
+    const restored: Record<string, number> = {};
+    for (const [id, quantity] of Object.entries(parsed)) {
+      if (
+        !products.some((product) => product.id === id) ||
+        typeof quantity !== "number" ||
+        !Number.isInteger(quantity) ||
+        quantity < 1 ||
+        quantity > 12
+      ) {
+        throw new Error("Invalid saved bag.");
+      }
+      restored[id] = quantity;
+    }
+    return { value: restored, warning: "" };
+  } catch {
+    return {
+      value: {},
+      warning: "Your saved bag could not be restored from this browser.",
+    };
+  }
+}
+
+function isSavedOrder(value: unknown): value is SavedOrder {
+  return (
+    isRecord(value) &&
+    typeof value.orderId === "string" &&
+    typeof value.amount === "number" &&
+    Number.isInteger(value.amount) &&
+    value.amount > 0 &&
+    (value.paymentMethod === "upi" || value.paymentMethod === "cod") &&
+    typeof value.createdAt === "string" &&
+    Number.isFinite(Date.parse(value.createdAt)) &&
+    Array.isArray(value.items) &&
+    value.items.length > 0 &&
+    value.items.length <= 8 &&
+    value.items.every(
+      (item: unknown) =>
+        isRecord(item) &&
+        typeof item.id === "string" &&
+        products.some((product) => product.id === item.id) &&
+        typeof item.quantity === "number" &&
+        Number.isInteger(item.quantity) &&
+        item.quantity >= 1 &&
+        item.quantity <= 12,
+    )
+  );
+}
+
+function readSavedOrders(snapshot: string | null): {
+  value: SavedOrder[];
+  warning: string;
+} {
+  if (snapshot === null) return { value: [], warning: "" };
+  if (snapshot === STORAGE_UNAVAILABLE) {
+    return {
+      value: [],
+      warning: "Browser storage is unavailable; order history cannot be saved.",
+    };
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(snapshot);
+    if (!Array.isArray(parsed) || !parsed.every(isSavedOrder)) {
+      throw new Error("Invalid saved order history.");
+    }
+    return { value: parsed.slice(0, 50), warning: "" };
+  } catch {
+    return {
+      value: [],
+      warning: "Saved order history could not be restored from this browser.",
+    };
+  }
+}
+
 export default function Storefront() {
-  const [cart, setCart] = useState<Record<string, number>>({});
+  const cartSnapshot = useSyncExternalStore(
+    subscribeToCart,
+    getCartSnapshot,
+    getServerSnapshot,
+  );
+  const ordersSnapshot = useSyncExternalStore(
+    subscribeToOrders,
+    getOrdersSnapshot,
+    getServerSnapshot,
+  );
+  const savedCart = readSavedCart(cartSnapshot);
+  const savedOrders = readSavedOrders(ordersSnapshot);
+  const cart = savedCart.value;
+  const orders = savedOrders.value;
+  const [storageWarning, setStorageWarning] = useState("");
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isOrdersOpen, setIsOrdersOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [order, setOrder] = useState<CreatedOrder | null>(null);
   const [copied, setCopied] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"upi" | "cod">("upi");
 
+  const storageMessage =
+    [savedCart.warning, savedOrders.warning, storageWarning]
+      .filter(Boolean)
+      .join(" ") || "";
   const cartItems = products
     .filter((product) => cart[product.id])
     .map((product) => ({ ...product, quantity: cart[product.id] }));
@@ -91,21 +262,29 @@ export default function Storefront() {
   const total = subtotal + deliveryFee;
 
   function changeQuantity(productId: string, change: number) {
-    setCart((current) => {
-      const quantity = (current[productId] ?? 0) + change;
-      const next = { ...current };
-      if (quantity <= 0) delete next[productId];
-      else next[productId] = quantity;
-      return next;
-    });
+    const quantity = (cart[productId] ?? 0) + change;
+    const next = { ...cart };
+    if (quantity <= 0) delete next[productId];
+    else next[productId] = quantity;
+    if (!writeStorageValue(CART_STORAGE_KEY, JSON.stringify(next))) {
+      setStorageWarning("This browser could not save your bag.");
+    } else {
+      setStorageWarning("");
+    }
     setOrder(null);
     setError("");
   }
 
   function openCart() {
+    setIsOrdersOpen(false);
     setOrder(null);
     setError("");
     setIsCartOpen(true);
+  }
+
+  function openOrders() {
+    setIsCartOpen(false);
+    setIsOrdersOpen(true);
   }
 
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
@@ -113,6 +292,10 @@ export default function Storefront() {
     setError("");
     setIsSubmitting(true);
     const formData = new FormData(event.currentTarget);
+    const orderedItems = cartItems.map(({ id, quantity }) => ({
+      id,
+      quantity,
+    }));
 
     try {
       const response = await fetch("/api/orders", {
@@ -124,18 +307,47 @@ export default function Storefront() {
             phone: formData.get("phone"),
             address: formData.get("address"),
           },
-          items: cartItems.map(({ id, quantity }) => ({ id, quantity })),
+          items: orderedItems,
+          paymentMethod: formData.get("paymentMethod"),
         }),
       });
       const result = (await response.json()) as
         | CreatedOrder
         | { error: string };
-      if (!response.ok || !("paymentLink" in result)) {
+      if (
+        !response.ok ||
+        !("paymentMethod" in result) ||
+        (result.paymentMethod === "upi" &&
+          (!("paymentLink" in result) || !("upiId" in result)))
+      ) {
         throw new Error(
           "error" in result ? result.error : "Could not create order.",
         );
       }
       setOrder(result);
+      const savedOrder: SavedOrder = {
+        orderId: result.orderId,
+        amount: result.amount,
+        paymentMethod: result.paymentMethod,
+        items: orderedItems,
+        createdAt: new Date().toISOString(),
+      };
+      const nextOrders = [
+        savedOrder,
+        ...orders.filter((saved) => saved.orderId !== result.orderId),
+      ].slice(0, 50);
+      const historySaved = writeStorageValue(
+        ORDERS_STORAGE_KEY,
+        JSON.stringify(nextOrders),
+      );
+      const cartCleared = writeStorageValue(CART_STORAGE_KEY, "{}");
+      if (!historySaved || !cartCleared) {
+        setStorageWarning(
+          "Order was placed, but this browser could not save your order history or clear the bag.",
+        );
+      } else {
+        setStorageWarning("");
+      }
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -148,7 +360,7 @@ export default function Storefront() {
   }
 
   async function copyUpiId() {
-    if (!order) return;
+    if (!order || order.paymentMethod !== "upi") return;
     try {
       await navigator.clipboard.writeText(order.upiId);
       setCopied(true);
@@ -186,16 +398,31 @@ export default function Storefront() {
           <a href="#ingredients">Our ingredients</a>
           <a href="#delivery">Delivery</a>
         </nav>
-        <button
-          className="bag-button"
-          onClick={openCart}
-          aria-label={`Open bag, ${itemCount} items`}
-        >
-          <ShoppingBag size={19} aria-hidden="true" />
-          <span>Bag</span>
-          <span className="bag-count">{itemCount}</span>
-        </button>
+        <div className="header-actions">
+          <button className="orders-button" onClick={openOrders}>
+            <ClipboardList size={18} aria-hidden="true" />
+            <span>My orders</span>
+            {orders.length > 0 && (
+              <span className="orders-count">{orders.length}</span>
+            )}
+          </button>
+          <button
+            className="bag-button"
+            onClick={openCart}
+            aria-label={`Open bag, ${itemCount} items`}
+          >
+            <ShoppingBag size={19} aria-hidden="true" />
+            <span>Bag</span>
+            <span className="bag-count">{itemCount}</span>
+          </button>
+        </div>
       </header>
+
+      {storageMessage && (
+        <p className="storage-warning" role="status">
+          {storageMessage}
+        </p>
+      )}
 
       <section className="hero" id="home">
         <div
@@ -412,31 +639,53 @@ export default function Storefront() {
                 <p className="eyebrow">
                   ORDER {order.orderId.slice(0, 8).toUpperCase()}
                 </p>
-                <h3>One last step.</h3>
-                <p className="payment-lead">
-                  Pay {formatPrice(order.amount)} using any UPI app.
-                </p>
-                <div className="qr-frame">
-                  <QRCodeSVG
-                    value={order.paymentLink}
-                    size={176}
-                    level="M"
-                    includeMargin
-                  />
-                </div>
-                <a className="pay-button" href={order.paymentLink}>
-                  Pay with UPI <ChevronRight size={17} aria-hidden="true" />
-                </a>
-                <div className="upi-id-row">
-                  <span>{order.upiId}</span>
-                  <button onClick={copyUpiId} aria-label="Copy UPI ID">
-                    {copied ? <Check size={16} /> : <span>Copy</span>}
-                  </button>
-                </div>
-                <p className="payment-disclaimer">
-                  The order is saved as payment pending. Payment is not
-                  confirmed automatically; the store must verify your transfer.
-                </p>
+                {order.paymentMethod === "upi" ? (
+                  <>
+                    <h3>Order received!</h3>
+                    <p className="payment-lead">
+                      Pay {formatPrice(order.amount)} using any UPI app.
+                    </p>
+                    <div className="qr-frame">
+                      <QRCodeSVG
+                        value={order.paymentLink}
+                        size={176}
+                        level="M"
+                        includeMargin
+                      />
+                    </div>
+                    <a
+                      className="pay-button"
+                      href={order.paymentLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Pay with UPI <ChevronRight size={17} aria-hidden="true" />
+                    </a>
+                    <div className="upi-id-row">
+                      <span>{order.upiId}</span>
+                      <button onClick={copyUpiId} aria-label="Copy UPI ID">
+                        {copied ? <Check size={16} /> : <span>Copy</span>}
+                      </button>
+                    </div>
+                    <p className="payment-disclaimer">
+                      If the UPI app does not open, scan the QR or copy the UPI
+                      ID. Your order is saved; payment remains pending until
+                      the store verifies it.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3>Order confirmed!</h3>
+                    <p className="payment-lead">
+                      Your order total is {formatPrice(order.amount)}. Pay cash
+                      when it is delivered.
+                    </p>
+                    <p className="payment-disclaimer">
+                      Payment is due on delivery. Delivery attempts are between
+                      6 AM and 8 AM.
+                    </p>
+                  </>
+                )}
                 {order.notificationWarning && (
                   <p className="payment-disclaimer" role="status">
                     {order.notificationWarning}
@@ -446,7 +695,6 @@ export default function Storefront() {
                   className="done-button"
                   onClick={() => {
                     setIsCartOpen(false);
-                    setCart({});
                     setOrder(null);
                   }}
                 >
@@ -559,6 +807,29 @@ export default function Storefront() {
                       placeholder="House, street, area and PIN code"
                     />
                   </label>
+                  <fieldset className="payment-options">
+                    <legend>Payment method</legend>
+                    <label className="payment-option">
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="upi"
+                        checked={paymentMethod === "upi"}
+                        onChange={() => setPaymentMethod("upi")}
+                      />
+                      <span>Pay with UPI</span>
+                    </label>
+                    <label className="payment-option">
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="cod"
+                        checked={paymentMethod === "cod"}
+                        onChange={() => setPaymentMethod("cod")}
+                      />
+                      <span>Cash on delivery</span>
+                    </label>
+                  </fieldset>
                   {error && (
                     <p className="form-error" role="alert">
                       {error}
@@ -573,16 +844,100 @@ export default function Storefront() {
                       "Preparing your order..."
                     ) : (
                       <>
-                        Continue to UPI{" "}
+                        {paymentMethod === "upi"
+                          ? "Continue to UPI"
+                          : "Place COD order"}{" "}
                         <ChevronRight size={17} aria-hidden="true" />
                       </>
                     )}
                   </button>
                   <p className="secure-note">
-                    UPI payment opens after your order is created.
+                    {paymentMethod === "upi"
+                      ? "UPI payment opens after your order is created."
+                      : "Pay cash when your order is delivered."}
                   </p>
                 </form>
               </>
+            )}
+          </aside>
+        </div>
+      )}
+      {isOrdersOpen && (
+        <div
+          className="drawer-backdrop"
+          onMouseDown={(event) =>
+            event.target === event.currentTarget && setIsOrdersOpen(false)
+          }
+        >
+          <aside
+            className="cart-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="orders-title"
+          >
+            <div className="drawer-header">
+              <div>
+                <p className="eyebrow">YOUR PAST ORDERS</p>
+                <h2 id="orders-title">My orders</h2>
+              </div>
+              <button
+                className="icon-button"
+                onClick={() => setIsOrdersOpen(false)}
+                aria-label="Close order history"
+              >
+                <X size={21} />
+              </button>
+            </div>
+            <p className="orders-storage-note">
+              Order history is saved on this browser and device only.
+            </p>
+            {orders.length === 0 ? (
+              <div className="empty-bag">
+                <span className="empty-bag-icon">
+                  <ClipboardList size={25} />
+                </span>
+                <h3>No orders yet.</h3>
+                <p>Your completed orders will appear here.</p>
+              </div>
+            ) : (
+              <div className="orders-list">
+                {orders.map((savedOrder) => (
+                  <article className="saved-order" key={savedOrder.orderId}>
+                    <div className="saved-order-heading">
+                      <strong>
+                        Order {savedOrder.orderId.slice(0, 8).toUpperCase()}
+                      </strong>
+                      <time dateTime={savedOrder.createdAt}>
+                        {new Intl.DateTimeFormat("en-IN", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        }).format(new Date(savedOrder.createdAt))}
+                      </time>
+                    </div>
+                    <p className="saved-order-status">
+                      {savedOrder.paymentMethod === "upi"
+                        ? "UPI · Payment pending verification"
+                        : "Cash on delivery · Confirmed"}
+                    </p>
+                    <ul>
+                      {savedOrder.items.map((item) => {
+                        const product = products.find(
+                          ({ id }) => id === item.id,
+                        );
+                        return (
+                          <li key={item.id}>
+                            {product?.name ?? "Juice"} × {item.quantity}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <div className="saved-order-total">
+                      <span>Total</span>
+                      <strong>{formatPrice(savedOrder.amount)}</strong>
+                    </div>
+                  </article>
+                ))}
+              </div>
             )}
           </aside>
         </div>

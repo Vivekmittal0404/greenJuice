@@ -43,6 +43,14 @@ export async function POST(request: Request) {
     );
   }
 
+  const paymentMethod = payload.paymentMethod ?? "upi";
+  if (paymentMethod !== "upi" && paymentMethod !== "cod") {
+    return NextResponse.json(
+      { error: "Choose UPI or cash on delivery." },
+      { status: 400 },
+    );
+  }
+
   const { name, phone, address } = payload.customer;
   if (
     !text(name) ||
@@ -115,7 +123,7 @@ export async function POST(request: Request) {
   const notificationEmail = process.env.ORDER_NOTIFICATION_EMAIL?.trim();
   const senderEmail = process.env.RESEND_FROM_EMAIL?.trim();
 
-  if (!upiId) {
+  if (paymentMethod === "upi" && !upiId) {
     return NextResponse.json(
       {
         error:
@@ -175,13 +183,29 @@ export async function POST(request: Request) {
         subtotal_inr: subtotal,
         delivery_fee_inr: deliveryFee,
         amount_inr: amount,
+        payment_method: paymentMethod,
         payment_status: "pending",
       }),
       cache: "no-store",
     });
-  } catch {
+  } catch (error) {
+    const causeCode =
+      error instanceof Error &&
+      "cause" in error &&
+      isRecord(error.cause) &&
+      text(error.cause.code)
+        ? error.cause.code
+        : "unknown";
+    console.error(
+      "Supabase order insert request failed",
+      error instanceof Error ? error.name : "UnknownError",
+      causeCode,
+    );
     return NextResponse.json(
-      { error: "Could not reach the order service. Please try again." },
+      {
+        error:
+          "Could not connect to Supabase. Check the SUPABASE_URL and confirm the project is available.",
+      },
       { status: 502 },
     );
   }
@@ -214,6 +238,15 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     }
+    if (errorCode === "PGRST204") {
+      return NextResponse.json(
+        {
+          error:
+            "Supabase is missing the payment_method column. Run the latest supabase/schema.sql in the Supabase SQL Editor, then try again.",
+        },
+        { status: 503 },
+      );
+    }
     return NextResponse.json(
       { error: "Could not save your order. Please try again." },
       { status: 502 },
@@ -231,7 +264,10 @@ export async function POST(request: Request) {
     const orderReference = orderId.slice(0, 8).toUpperCase();
     const emailText = [
       `New Root & Ritual order ${orderReference}`,
-      "Payment status: PENDING (UPI payment is not automatically verified).",
+      `Payment method: ${paymentMethod === "upi" ? "UPI" : "Cash on delivery"}`,
+      paymentMethod === "upi"
+        ? "Payment status: PENDING (UPI payment is not automatically verified)."
+        : "Payment status: DUE ON DELIVERY (cash on delivery).",
       "",
       `Customer: ${name.trim().replace(/[\r\n]+/g, " ")}`,
       `Phone: ${phone.trim()}`,
@@ -255,7 +291,7 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           from: senderEmail,
           to: [notificationEmail],
-          subject: `New order ${orderReference} (payment pending)`,
+          subject: `New order ${orderReference} (${paymentMethod === "upi" ? "UPI payment pending" : "cash on delivery"})`,
           text: emailText,
         }),
         signal: AbortSignal.timeout(10_000),
@@ -277,6 +313,29 @@ export async function POST(request: Request) {
     }
   }
 
+  const orderResponse = {
+    orderId,
+    amount,
+    paymentMethod,
+    notificationWarning: emailSent
+      ? undefined
+      : "Order saved, but the store email is not configured or was not accepted by Resend.",
+  };
+
+  if (paymentMethod === "cod") {
+    return NextResponse.json(orderResponse);
+  }
+
+  if (!upiId) {
+    return NextResponse.json(
+      {
+        error:
+          "UPI payments are not set up yet. Add the store's UPI ID as the server environment variable UPI_ID.",
+      },
+      { status: 503 },
+    );
+  }
+
   const paymentLink = new URL("upi://pay");
   paymentLink.searchParams.set("pa", upiId);
   paymentLink.searchParams.set("pn", upiName);
@@ -285,12 +344,8 @@ export async function POST(request: Request) {
   paymentLink.searchParams.set("tn", `Root & Ritual ${orderId.slice(0, 8)}`);
 
   return NextResponse.json({
-    orderId,
+    ...orderResponse,
     paymentLink: paymentLink.toString(),
     upiId,
-    amount,
-    notificationWarning: emailSent
-      ? undefined
-      : "Order saved, but the store email is not configured or was not accepted by Resend.",
   });
 }

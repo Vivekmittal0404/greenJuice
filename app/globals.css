@@ -148,6 +148,38 @@ textarea:focus-visible {
 .desktop-nav a:hover {
   color: var(--forest);
 }
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.orders-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 0;
+  border: 0;
+  color: var(--forest);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+.orders-count {
+  position: absolute;
+  top: 0;
+  right: -8px;
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+  color: var(--forest);
+  background: var(--lime);
+  border-radius: 10px;
+  font-size: 10px;
+}
 .bag-button {
   height: 42px;
   display: inline-flex;
@@ -223,6 +255,14 @@ textarea:focus-visible {
   gap: 9px;
   margin-bottom: 20px;
   color: #d9e68c;
+}
+.storage-warning {
+  margin: 0;
+  padding: 9px 16px;
+  color: #713b20;
+  background: #fff0d8;
+  font-size: 12px;
+  text-align: center;
 }
 .hero-eyebrow span {
   width: 7px;
@@ -717,6 +757,63 @@ textarea:focus-visible {
   font-family: var(--sans);
   font-size: 13px;
 }
+.orders-storage-note {
+  margin: 14px 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.saved-order {
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: var(--white);
+}
+.saved-order-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.saved-order-heading strong {
+  color: var(--forest);
+  font-size: 12px;
+}
+.saved-order-heading time {
+  color: var(--muted);
+  font-size: 9px;
+  text-align: right;
+}
+.saved-order-status {
+  margin: 8px 0;
+  color: var(--green);
+  font-size: 10px;
+  font-weight: 600;
+}
+.saved-order ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 11px;
+  list-style: none;
+}
+.saved-order-total {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 11px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+}
+.saved-order-total strong {
+  color: var(--forest);
+}
 .icon-button {
   width: 38px;
   height: 38px;
@@ -847,6 +944,33 @@ textarea:focus-visible {
 .checkout-form input::placeholder,
 .checkout-form textarea::placeholder {
   color: #a2aaa0;
+}
+.payment-options {
+  display: grid;
+  gap: 8px;
+  margin: 2px 0 0;
+  padding: 10px 11px;
+  border: 1px solid #d4ddd1;
+}
+.payment-options legend {
+  padding: 0 4px;
+  color: #556258;
+  font-size: 10px;
+  font-weight: 600;
+}
+.payment-option {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 11px;
+  cursor: pointer;
+}
+.payment-option input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--forest);
 }
 .pay-button {
   min-height: 45px;
@@ -1110,6 +1234,18 @@ textarea:focus-visible {
     height: 66px;
     gap: 8px;
     padding: 0 17px;
+  }
+  .header-actions {
+    gap: 10px;
+  }
+  .orders-button {
+    width: 34px;
+    height: 38px;
+    justify-content: center;
+    padding: 0;
+  }
+  .orders-button > span:first-of-type {
+    display: none;
   }
   .brand {
     gap: 7px;

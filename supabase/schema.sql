@@ -9,11 +9,18 @@ create table if not exists public.orders (
   subtotal_inr integer not null check (subtotal_inr > 0),
   delivery_fee_inr integer not null check (delivery_fee_inr >= 0),
   amount_inr integer not null check (amount_inr > 0),
+  payment_method text not null default 'upi' check (payment_method in ('upi', 'cod')),
   payment_status text not null default 'pending' check (payment_status in ('pending', 'paid', 'cancelled')),
   created_at timestamptz not null default now()
 );
+
+alter table public.orders
+  add column if not exists payment_method text not null default 'upi'
+  check (payment_method in ('upi', 'cod'));
 
 alter table public.orders enable row level security;
 grant usage on schema public to service_role;
 grant select, insert on table public.orders to service_role;
 create index if not exists orders_created_at_idx on public.orders (created_at desc);
+
+notify pgrst, 'reload schema';
