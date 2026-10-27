@@ -17,7 +17,8 @@ import {
   ShoppingBag,
   X,
 } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+import Script from "next/script";
+import Link from "next/link";
 
 type Product = {
   id: string;
@@ -37,17 +38,49 @@ type CreatedOrder = {
   amount: number;
   notificationWarning?: string;
 } & (
-  | { paymentMethod: "upi"; paymentLink: string; upiId: string }
+  | {
+      paymentMethod: "razorpay";
+      razorpayKeyId: string;
+      razorpayOrderId: string;
+      paymentStatus?: "pending" | "paid";
+    }
   | { paymentMethod: "cod" }
 );
 
 type SavedOrder = {
   orderId: string;
   amount: number;
-  paymentMethod: "upi" | "cod";
+  paymentMethod: "razorpay" | "upi" | "cod";
+  paymentStatus?: "pending" | "paid";
   items: Array<{ id: string; quantity: number }>;
   createdAt: string;
 };
+
+type RazorpayPaymentResponse = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+type RazorpayCheckoutOptions = {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill: { name: string; contact: string };
+  theme: { color: string };
+  handler: (response: RazorpayPaymentResponse) => void;
+};
+
+declare global {
+  interface Window {
+    Razorpay?: new (
+      options: RazorpayCheckoutOptions,
+    ) => { open: () => void };
+  }
+}
 
 const CART_STORAGE_KEY = "root-ritual-cart-v1";
 const ORDERS_STORAGE_KEY = "root-ritual-orders-v1";
@@ -177,7 +210,12 @@ function isSavedOrder(value: unknown): value is SavedOrder {
     typeof value.amount === "number" &&
     Number.isInteger(value.amount) &&
     value.amount > 0 &&
-    (value.paymentMethod === "upi" || value.paymentMethod === "cod") &&
+    (value.paymentMethod === "razorpay" ||
+      value.paymentMethod === "upi" ||
+      value.paymentMethod === "cod") &&
+    (value.paymentStatus === undefined ||
+      value.paymentStatus === "pending" ||
+      value.paymentStatus === "paid") &&
     typeof value.createdAt === "string" &&
     Number.isFinite(Date.parse(value.createdAt)) &&
     Array.isArray(value.items) &&
@@ -243,8 +281,15 @@ export default function Storefront() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [order, setOrder] = useState<CreatedOrder | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"upi" | "cod">("upi");
+  const [paymentCustomer, setPaymentCustomer] = useState({
+    name: "",
+    phone: "",
+  });
+  const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">(
+    "razorpay",
+  );
+  const [razorpayReady, setRazorpayReady] = useState(false);
+  const [razorpayLoadError, setRazorpayLoadError] = useState("");
 
   const storageMessage =
     [savedCart.warning, savedOrders.warning, storageWarning]
@@ -317,18 +362,26 @@ export default function Storefront() {
       if (
         !response.ok ||
         !("paymentMethod" in result) ||
-        (result.paymentMethod === "upi" &&
-          (!("paymentLink" in result) || !("upiId" in result)))
+        (result.paymentMethod === "razorpay" &&
+          (!("razorpayKeyId" in result) ||
+            !("razorpayOrderId" in result)))
       ) {
         throw new Error(
           "error" in result ? result.error : "Could not create order.",
         );
       }
-      setOrder(result);
+      const savedOrderResult =
+        result.paymentMethod === "razorpay"
+          ? { ...result, paymentStatus: "pending" as const }
+          : result;
+      setOrder(savedOrderResult);
       const savedOrder: SavedOrder = {
         orderId: result.orderId,
         amount: result.amount,
         paymentMethod: result.paymentMethod,
+        ...(result.paymentMethod === "razorpay"
+          ? { paymentStatus: "pending" as const }
+          : {}),
         items: orderedItems,
         createdAt: new Date().toISOString(),
       };
@@ -348,6 +401,14 @@ export default function Storefront() {
       } else {
         setStorageWarning("");
       }
+      if (savedOrderResult.paymentMethod === "razorpay") {
+        const customer = {
+          name: String(formData.get("name") ?? ""),
+          phone: String(formData.get("phone") ?? ""),
+        };
+        setPaymentCustomer(customer);
+        openRazorpayCheckout(savedOrderResult, customer);
+      }
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -359,19 +420,109 @@ export default function Storefront() {
     }
   }
 
-  async function copyUpiId() {
-    if (!order || order.paymentMethod !== "upi") return;
+  function openRazorpayCheckout(
+    razorpayOrder: Extract<CreatedOrder, { paymentMethod: "razorpay" }>,
+    customer: { name: string; phone: string },
+  ) {
+    if (!window.Razorpay) {
+      setError("Secure payment is not available right now. Please try again.");
+      return;
+    }
+
     try {
-      await navigator.clipboard.writeText(order.upiId);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setError("Copy is unavailable in this browser. Use the UPI QR instead.");
+      const checkout = new window.Razorpay({
+        key: razorpayOrder.razorpayKeyId,
+        amount: razorpayOrder.amount * 100,
+        currency: "INR",
+        name: "Root & Ritual",
+        description: `Order ${razorpayOrder.orderId.slice(0, 8).toUpperCase()}`,
+        order_id: razorpayOrder.razorpayOrderId,
+        prefill: { name: customer.name, contact: customer.phone },
+        theme: { color: "#183b2b" },
+        handler: async (payment) => {
+          setError("");
+          setIsSubmitting(true);
+          try {
+            const response = await fetch("/api/orders/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                orderId: razorpayOrder.orderId,
+                ...payment,
+              }),
+            });
+            const result = (await response.json()) as
+              | { paymentStatus: "paid" }
+              | { error: string };
+            if (
+              !response.ok ||
+              !("paymentStatus" in result) ||
+              result.paymentStatus !== "paid"
+            ) {
+              throw new Error(
+                "error" in result
+                  ? result.error
+                  : "Could not confirm payment. Please contact support.",
+              );
+            }
+
+            setOrder((current) =>
+              current?.orderId === razorpayOrder.orderId
+                ? { ...current, paymentStatus: "paid" }
+                : current,
+            );
+            const savedOrdersNow = readSavedOrders(getOrdersSnapshot()).value;
+            const updatedOrders = savedOrdersNow.map((savedOrder) =>
+              savedOrder.orderId === razorpayOrder.orderId
+                ? { ...savedOrder, paymentStatus: "paid" as const }
+                : savedOrder,
+            );
+            if (
+              !writeStorageValue(
+                ORDERS_STORAGE_KEY,
+                JSON.stringify(updatedOrders),
+              )
+            ) {
+              setStorageWarning(
+                "Payment was confirmed, but this browser could not update your order history.",
+              );
+            }
+          } catch (verificationError) {
+            setError(
+              verificationError instanceof Error
+                ? verificationError.message
+                : "Could not confirm payment. Please contact support.",
+            );
+          } finally {
+            setIsSubmitting(false);
+          }
+        },
+      });
+      checkout.open();
+    } catch (checkoutError) {
+      setError(
+        checkoutError instanceof Error
+          ? checkoutError.message
+          : "Secure payment could not be opened. Please try again.",
+      );
     }
   }
 
   return (
     <main>
+      <Script
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        strategy="afterInteractive"
+        onReady={() => {
+          setRazorpayReady(true);
+          setRazorpayLoadError("");
+        }}
+        onError={() =>
+          setRazorpayLoadError(
+            "Secure checkout did not load. Check your connection and refresh.",
+          )
+        }
+      />
       <div className="delivery-ribbon">
         <Clock3 aria-hidden="true" size={17} />
         <span>
@@ -397,6 +548,7 @@ export default function Storefront() {
           <a href="#juices">The juices</a>
           <a href="#ingredients">Our ingredients</a>
           <a href="#delivery">Delivery</a>
+          <Link href="/contact">Contact</Link>
         </nav>
         <div className="header-actions">
           <button className="orders-button" onClick={openOrders}>
@@ -597,6 +749,7 @@ export default function Storefront() {
           </span>
         </a>
         <p>Serving Bhiwani only. More areas coming soon.</p>
+        <Link href="/contact">Contact support</Link>
         <a href="#delivery">
           Delivery hours <span>06:00 - 08:00</span>
         </a>
@@ -639,38 +792,43 @@ export default function Storefront() {
                 <p className="eyebrow">
                   ORDER {order.orderId.slice(0, 8).toUpperCase()}
                 </p>
-                {order.paymentMethod === "upi" ? (
+                {order.paymentMethod === "razorpay" ? (
                   <>
-                    <h3>Order received!</h3>
-                    <p className="payment-lead">
-                      Pay {formatPrice(order.amount)} using any UPI app.
-                    </p>
-                    <div className="qr-frame">
-                      <QRCodeSVG
-                        value={order.paymentLink}
-                        size={176}
-                        level="M"
-                        includeMargin
-                      />
-                    </div>
-                    <a
-                      className="pay-button"
-                      href={order.paymentLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Pay with UPI <ChevronRight size={17} aria-hidden="true" />
-                    </a>
-                    <div className="upi-id-row">
-                      <span>{order.upiId}</span>
-                      <button onClick={copyUpiId} aria-label="Copy UPI ID">
-                        {copied ? <Check size={16} /> : <span>Copy</span>}
-                      </button>
-                    </div>
+                    <h3>
+                      {order.paymentStatus === "paid"
+                        ? "Payment confirmed!"
+                        : "Order received!"}
+                    </h3>
                     <p className="payment-disclaimer">
-                      If the UPI app does not open, scan the QR or copy the UPI
-                      ID. Your order is saved; payment remains pending until
-                      the store verifies it.
+                      {order.paymentStatus === "paid"
+                        ? `Your payment of ${formatPrice(order.amount)} is confirmed.`
+                        : `Your order is saved. Complete your ${formatPrice(order.amount)} payment securely with Razorpay; the order stays pending until payment is confirmed.`}
+                    </p>
+                    {order.paymentStatus !== "paid" && (
+                      <button
+                        className="pay-button"
+                        type="button"
+                        disabled={!razorpayReady || isSubmitting}
+                        onClick={() =>
+                          openRazorpayCheckout(order, paymentCustomer)
+                        }
+                      >
+                        Pay with Razorpay{" "}
+                        <ChevronRight size={17} aria-hidden="true" />
+                      </button>
+                    )}
+                    {error && (
+                      <p className="form-error" role="alert">
+                        {error}
+                      </p>
+                    )}
+                    {!razorpayReady && razorpayLoadError && (
+                      <p className="form-error" role="alert">
+                        {razorpayLoadError}
+                      </p>
+                    )}
+                    <p className="payment-disclaimer">
+                      Need help? <Link href="/contact">Contact support</Link>.
                     </p>
                   </>
                 ) : (
@@ -813,11 +971,11 @@ export default function Storefront() {
                       <input
                         type="radio"
                         name="paymentMethod"
-                        value="upi"
-                        checked={paymentMethod === "upi"}
-                        onChange={() => setPaymentMethod("upi")}
+                        value="razorpay"
+                        checked={paymentMethod === "razorpay"}
+                        onChange={() => setPaymentMethod("razorpay")}
                       />
-                      <span>Pay with UPI</span>
+                      <span>Pay online with Razorpay</span>
                     </label>
                     <label className="payment-option">
                       <input
@@ -830,30 +988,36 @@ export default function Storefront() {
                       <span>Cash on delivery</span>
                     </label>
                   </fieldset>
-                  {error && (
+                  {(error ||
+                    (paymentMethod === "razorpay" && razorpayLoadError)) && (
                     <p className="form-error" role="alert">
-                      {error}
+                      {error || razorpayLoadError}
                     </p>
                   )}
                   <button
                     className="pay-button checkout-button"
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={
+                      isSubmitting ||
+                      (paymentMethod === "razorpay" && !razorpayReady)
+                    }
                   >
                     {isSubmitting ? (
                       "Preparing your order..."
                     ) : (
                       <>
-                        {paymentMethod === "upi"
-                          ? "Continue to UPI"
+                        {paymentMethod === "razorpay"
+                          ? "Continue to Razorpay"
                           : "Place COD order"}{" "}
                         <ChevronRight size={17} aria-hidden="true" />
                       </>
                     )}
                   </button>
                   <p className="secure-note">
-                    {paymentMethod === "upi"
-                      ? "UPI payment opens after your order is created."
+                    {paymentMethod === "razorpay"
+                      ? razorpayReady
+                        ? "Secure Razorpay checkout opens after your order is created."
+                        : "Loading secure Razorpay checkout..."
                       : "Pay cash when your order is delivered."}
                   </p>
                 </form>
@@ -915,9 +1079,13 @@ export default function Storefront() {
                       </time>
                     </div>
                     <p className="saved-order-status">
-                      {savedOrder.paymentMethod === "upi"
-                        ? "UPI · Payment pending verification"
-                        : "Cash on delivery · Confirmed"}
+                      {savedOrder.paymentMethod === "razorpay"
+                        ? savedOrder.paymentStatus === "paid"
+                          ? "Razorpay · Paid"
+                          : "Razorpay · Payment pending"
+                        : savedOrder.paymentMethod === "upi"
+                          ? "UPI · Payment pending verification"
+                          : "Cash on delivery · Confirmed"}
                     </p>
                     <ul>
                       {savedOrder.items.map((item) => {

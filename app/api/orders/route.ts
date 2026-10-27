@@ -43,10 +43,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const paymentMethod = payload.paymentMethod ?? "upi";
-  if (paymentMethod !== "upi" && paymentMethod !== "cod") {
+  const paymentMethod = payload.paymentMethod ?? "razorpay";
+  if (paymentMethod !== "razorpay" && paymentMethod !== "cod") {
     return NextResponse.json(
-      { error: "Choose UPI or cash on delivery." },
+      { error: "Choose Razorpay or cash on delivery." },
       { status: 400 },
     );
   }
@@ -113,8 +113,8 @@ export async function POST(request: Request) {
   );
   const deliveryFee = 40;
   const amount = subtotal + deliveryFee;
-  const upiId = process.env.UPI_ID?.trim();
-  const upiName = process.env.UPI_NAME?.trim() || "Root and Ritual";
+  const razorpayKeyId = process.env.RAZORPAY_KEY_ID?.trim();
+  const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
   const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, "");
   const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY?.trim();
   const legacyServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
@@ -123,11 +123,11 @@ export async function POST(request: Request) {
   const notificationEmail = process.env.ORDER_NOTIFICATION_EMAIL?.trim();
   const senderEmail = process.env.RESEND_FROM_EMAIL?.trim();
 
-  if (paymentMethod === "upi" && !upiId) {
+  if (paymentMethod === "razorpay" && (!razorpayKeyId || !razorpayKeySecret)) {
     return NextResponse.json(
       {
         error:
-          "UPI payments are not set up yet. Add the store's UPI ID as the server environment variable UPI_ID.",
+          "Razorpay is not set up yet. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to the server environment.",
       },
       { status: 503 },
     );
@@ -162,6 +162,56 @@ export async function POST(request: Request) {
   }
 
   const orderId = randomUUID();
+  let razorpayOrderId: string | undefined;
+  if (paymentMethod === "razorpay") {
+    let razorpayResponse: Response;
+    try {
+      razorpayResponse = await fetch("https://api.razorpay.com/v1/orders", {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(
+            `${razorpayKeyId}:${razorpayKeySecret}`,
+          ).toString("base64")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: amount * 100,
+          currency: "INR",
+          receipt: orderId,
+        }),
+        signal: AbortSignal.timeout(10_000),
+        cache: "no-store",
+      });
+    } catch (error) {
+      console.error(
+        "Razorpay order creation request failed",
+        error instanceof Error ? error.name : "UnknownError",
+      );
+      return NextResponse.json(
+        { error: "Could not connect to Razorpay. Please try again." },
+        { status: 502 },
+      );
+    }
+
+    const razorpayPayload: unknown = await razorpayResponse
+      .json()
+      .catch(() => null);
+    if (
+      !razorpayResponse.ok ||
+      !isRecord(razorpayPayload) ||
+      !text(razorpayPayload.id) ||
+      razorpayPayload.amount !== amount * 100 ||
+      razorpayPayload.currency !== "INR"
+    ) {
+      console.error("Razorpay order creation failed", razorpayResponse.status);
+      return NextResponse.json(
+        { error: "Razorpay could not prepare your payment. Please try again." },
+        { status: 502 },
+      );
+    }
+    razorpayOrderId = razorpayPayload.id;
+  }
+
   let saveResponse: Response;
   try {
     saveResponse = await fetch(`${supabaseUrl}/rest/v1/orders`, {
@@ -185,6 +235,7 @@ export async function POST(request: Request) {
         amount_inr: amount,
         payment_method: paymentMethod,
         payment_status: "pending",
+        razorpay_order_id: razorpayOrderId ?? null,
       }),
       cache: "no-store",
     });
@@ -242,7 +293,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Supabase is missing the payment_method column. Run the latest supabase/schema.sql in the Supabase SQL Editor, then try again.",
+            "Supabase is missing required payment columns. Run the latest supabase/schema.sql in the Supabase SQL Editor, then try again.",
         },
         { status: 503 },
       );
@@ -264,9 +315,9 @@ export async function POST(request: Request) {
     const orderReference = orderId.slice(0, 8).toUpperCase();
     const emailText = [
       `New Root & Ritual order ${orderReference}`,
-      `Payment method: ${paymentMethod === "upi" ? "UPI" : "Cash on delivery"}`,
-      paymentMethod === "upi"
-        ? "Payment status: PENDING (UPI payment is not automatically verified)."
+      `Payment method: ${paymentMethod === "razorpay" ? "Razorpay" : "Cash on delivery"}`,
+      paymentMethod === "razorpay"
+        ? "Payment status: PENDING (awaiting Razorpay payment confirmation)."
         : "Payment status: DUE ON DELIVERY (cash on delivery).",
       "",
       `Customer: ${name.trim().replace(/[\r\n]+/g, " ")}`,
@@ -291,7 +342,7 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           from: senderEmail,
           to: [notificationEmail],
-          subject: `New order ${orderReference} (${paymentMethod === "upi" ? "UPI payment pending" : "cash on delivery"})`,
+          subject: `New order ${orderReference} (${paymentMethod === "razorpay" ? "Razorpay payment pending" : "cash on delivery"})`,
           text: emailText,
         }),
         signal: AbortSignal.timeout(10_000),
@@ -326,26 +377,16 @@ export async function POST(request: Request) {
     return NextResponse.json(orderResponse);
   }
 
-  if (!upiId) {
+  if (!razorpayKeyId || !razorpayOrderId) {
     return NextResponse.json(
-      {
-        error:
-          "UPI payments are not set up yet. Add the store's UPI ID as the server environment variable UPI_ID.",
-      },
-      { status: 503 },
+      { error: "Razorpay could not prepare your payment. Please try again." },
+      { status: 502 },
     );
   }
 
-  const paymentLink = new URL("upi://pay");
-  paymentLink.searchParams.set("pa", upiId);
-  paymentLink.searchParams.set("pn", upiName);
-  paymentLink.searchParams.set("am", amount.toFixed(2));
-  paymentLink.searchParams.set("cu", "INR");
-  paymentLink.searchParams.set("tn", `Root & Ritual ${orderId.slice(0, 8)}`);
-
   return NextResponse.json({
     ...orderResponse,
-    paymentLink: paymentLink.toString(),
-    upiId,
+    razorpayKeyId,
+    razorpayOrderId,
   });
 }

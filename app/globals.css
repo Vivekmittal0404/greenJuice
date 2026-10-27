@@ -704,7 +704,7 @@ textarea:focus-visible {
   color: #bac8b8;
   font-size: 11px;
 }
-.site-footer > a:last-child {
+.site-footer > a:not(.footer-brand) {
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -712,7 +712,7 @@ textarea:focus-visible {
   font-size: 10px;
   text-align: right;
 }
-.site-footer > a:last-child span {
+.site-footer > a:not(.footer-brand) span {
   color: white;
   font-size: 12px;
   font-weight: 700;
@@ -1071,41 +1071,8 @@ textarea:focus-visible {
   color: var(--muted);
   font-size: 12px;
 }
-.qr-frame {
-  width: 200px;
-  height: 200px;
-  display: grid;
-  place-items: center;
-  margin-bottom: 15px;
-  border: 1px solid var(--line);
-  background: white;
-}
 .payment-state > .pay-button {
   width: 100%;
-}
-.upi-id-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 12px;
-  padding: 11px 12px;
-  border: 1px solid var(--line);
-  background: var(--white);
-  font-size: 11px;
-}
-.upi-id-row button {
-  min-width: 42px;
-  display: grid;
-  place-items: center;
-  padding: 3px 4px;
-  border: 0;
-  color: var(--green);
-  background: transparent;
-  cursor: pointer;
-  font-size: 10px;
-  font-weight: 700;
 }
 .payment-disclaimer {
   margin: 13px 0;
@@ -1113,6 +1080,12 @@ textarea:focus-visible {
   font-size: 10px;
   line-height: 1.6;
   text-align: left;
+}
+.payment-disclaimer a {
+  color: var(--forest);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .done-button {
   width: 100%;
@@ -1123,6 +1096,108 @@ textarea:focus-visible {
   cursor: pointer;
   font-size: 11px;
   font-weight: 700;
+}
+
+.contact-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.contact-page .site-header {
+  width: 100%;
+}
+.contact-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--forest);
+  font-size: 12px;
+  font-weight: 600;
+}
+.support-section {
+  width: min(100% - 40px, 760px);
+  flex: 1;
+  margin: 0 auto;
+  padding: clamp(58px, 10vw, 105px) 0;
+}
+.support-heading {
+  max-width: 540px;
+  margin: 0 auto 34px;
+  text-align: center;
+}
+.support-heading .eyebrow {
+  color: #64745f;
+}
+.support-heading h1 {
+  margin: 10px 0 12px;
+  color: var(--forest);
+  font-family: var(--serif);
+  font-size: clamp(42px, 7vw, 64px);
+  font-weight: 500;
+}
+.support-heading > p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.support-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.support-option {
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  background: var(--white);
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+.support-option:hover {
+  transform: translateY(-2px);
+  border-color: #9baa8f;
+}
+.support-icon {
+  width: 39px;
+  height: 39px;
+  display: grid;
+  place-items: center;
+  color: var(--forest);
+  background: var(--lime);
+  border-radius: 50%;
+}
+.support-option > span:last-child {
+  display: grid;
+  gap: 5px;
+}
+.support-label {
+  color: var(--muted);
+  font-size: 10px;
+}
+.support-option strong {
+  overflow-wrap: anywhere;
+  color: var(--forest);
+  font-size: 12px;
+}
+.support-note {
+  margin: 21px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: center;
+}
+.contact-footer {
+  margin-top: auto;
+}
+.contact-footer > a:not(.footer-brand) {
+  text-align: right;
 }
 
 @keyframes content-arrive {
@@ -1234,6 +1309,28 @@ textarea:focus-visible {
     height: 66px;
     gap: 8px;
     padding: 0 17px;
+  }
+  .contact-back-link {
+    font-size: 0;
+  }
+  .contact-back-link svg {
+    width: 19px;
+    height: 19px;
+  }
+  .support-section {
+    width: min(100% - 32px, 460px);
+    padding: 58px 0;
+  }
+  .support-options {
+    grid-template-columns: 1fr;
+  }
+  .support-option {
+    min-height: 96px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 16px;
   }
   .header-actions {
     gap: 10px;
