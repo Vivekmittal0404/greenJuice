@@ -71,6 +71,11 @@ type RazorpayCheckoutOptions = {
   order_id: string;
   prefill: { name: string; contact: string };
   theme: { color: string };
+  config: {
+    display: {
+      hide: Array<{ method: "upi"; flows: ["collect"] }>;
+    };
+  };
   handler: (response: RazorpayPaymentResponse) => void;
 };
 
@@ -439,6 +444,11 @@ export default function Storefront() {
         order_id: razorpayOrder.razorpayOrderId,
         prefill: { name: customer.name, contact: customer.phone },
         theme: { color: "#183b2b" },
+        config: {
+          display: {
+            hide: [{ method: "upi", flows: ["collect"] }],
+          },
+        },
         handler: async (payment) => {
           setError("");
           setIsSubmitting(true);

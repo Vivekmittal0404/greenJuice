@@ -27,6 +27,8 @@ The order API validates customer details, looks up prices on the server, adds a 
 
 Razorpay checkout requires `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `SUPABASE_URL`, and `SUPABASE_SECRET_KEY` (or the legacy `SUPABASE_SERVICE_ROLE_KEY`). If any are missing, checkout explains the required setup and will not accept an order that cannot be recorded or paid to the configured merchant. The order email is sent only after the order is saved; if Resend settings are missing or the email is rejected, checkout continues and shows a notification warning.
 
+The checkout hides Razorpay's deprecated UPI Collect flow so mobile web uses UPI Intent where supported and desktop can use the available QR flow. Test API keys only simulate payments; replace both Razorpay keys with matching live credentials for real payments, and ensure UPI is enabled for the merchant account in the Razorpay Dashboard. Hosted Razorpay Checkout supplies the merchant payment details, so a custom `UPI_ID` environment variable is not used by this integration.
+
 ## Payment confirmation
 
 The Razorpay checkout response is verified on the server using the payment signature and Razorpay's payment API. An order is marked `paid` only after Razorpay reports the matching payment as captured. If a payment is interrupted or not captured, the order stays `pending` and can be paid again from the order confirmation. COD orders remain due in cash on delivery. Configure Razorpay webhooks separately if you need payment updates when customers close the checkout before returning to the site.
