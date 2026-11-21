@@ -13,9 +13,18 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Root & Ritual | 100% Raw Cold-Pressed Juices Delivered Everywhere",
+  title: "JuiceWala | 100% Raw Packed Juices",
   description:
-    "Direct-to-doorstep raw cold-pressed juices, immunity boosters, and detox cleanses. Zero added sugar, zero water, 100% pure living produce delivered nationwide in temperature-controlled cold packs.",
+    "JuiceWala - 100% pure raw cold-pressed juices delivered fresh to your doorstep.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/icon.png", type: "image/png", sizes: "192x192" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

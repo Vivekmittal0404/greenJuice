@@ -11,6 +11,7 @@ import {
   Droplets,
   Info,
   Leaf,
+  MapPin,
   Minus,
   Pencil,
   Plus,
@@ -828,9 +829,53 @@ export default function Storefront() {
   const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">(
     "razorpay",
   );
-  const [deliverySlot, setDeliverySlot] = useState<"morning" | "express">(
-    "morning",
-  );
+  const [cityInput, setCityInput] = useState("Bhiwani");
+  const [pincodeInput, setPincodeInput] = useState("");
+  const [showLocationRestrictionModal, setShowLocationRestrictionModal] =
+    useState(false);
+  const [restrictedCityEntered, setRestrictedCityEntered] = useState("");
+
+  function isBhiwaniLocation(city: string, pin: string): boolean {
+    const cleanCity = city.trim().toLowerCase();
+    const cleanPin = pin.trim();
+
+    if (cleanPin.length === 6 && !cleanPin.startsWith("127")) {
+      return false;
+    }
+
+    if (cleanCity && !cleanCity.includes("bhiwani")) {
+      const otherDistricts = [
+        "hisar",
+        "hissar",
+        "delhi",
+        "rohtak",
+        "gurgaon",
+        "gurugram",
+        "faridabad",
+        "panipat",
+        "sonipat",
+        "karnal",
+        "ambala",
+        "sirsa",
+        "rewari",
+        "narnaul",
+        "jind",
+        "fatehabad",
+        "jhajjar",
+        "chandigarh",
+        "noida",
+        "jaipur",
+      ];
+      if (otherDistricts.some((d) => cleanCity.includes(d))) {
+        return false;
+      }
+      if (!cleanPin.startsWith("127")) {
+        return false;
+      }
+    }
+
+    return true;
+  }
   const [razorpayReady, setRazorpayReady] = useState(false);
   const [razorpayLoadError, setRazorpayLoadError] = useState("");
 
@@ -943,7 +988,22 @@ export default function Storefront() {
     const city = (formData.get("city") as string) || "";
     const pincode = (formData.get("pincode") as string) || "";
     const streetAddress = (formData.get("address") as string) || "";
-    const fullAddress = `${streetAddress.trim()}, ${city.trim()} - ${pincode.trim()} [Slot: ${deliverySlot === "morning" ? "Morning 6-9 AM" : "Standard Express"}]`;
+
+    if (!isBhiwaniLocation(city, pincode)) {
+      setIsSubmitting(false);
+      setRestrictedCityEntered(
+        city.trim() !== "Bhiwani" && city.trim()
+          ? city.trim()
+          : `PIN ${pincode.trim()}`,
+      );
+      setShowLocationRestrictionModal(true);
+      setError(
+        "Currently, JuiceWala delivers fresh juice in Bhiwani only (PIN codes starting with 127). We are expanding soon!",
+      );
+      return;
+    }
+
+    const fullAddress = `${streetAddress.trim()}, ${city.trim()} - ${pincode.trim()}`;
 
     try {
       const response = await fetch("/api/orders", {
@@ -1042,8 +1102,8 @@ export default function Storefront() {
         key: razorpayOrder.razorpayKeyId,
         amount: razorpayOrder.amount * 100,
         currency: "INR",
-        name: "Root & Ritual Juice Co.",
-        description: `Cold-Pressed Juice Order ${razorpayOrder.orderId.slice(0, 8).toUpperCase()}`,
+        name: "JuiceWala",
+        description: `Juice Order ${razorpayOrder.orderId.slice(0, 8).toUpperCase()}`,
         order_id: razorpayOrder.razorpayOrderId,
         prefill: {
           name: customer.name,
@@ -1328,7 +1388,7 @@ export default function Storefront() {
 
       {/* Site Header */}
       <header className="site-header">
-        <a className="brand" href="#home" aria-label="Root & Ritual home">
+        <a className="brand" href="#home" aria-label="JuiceWala home">
           <span className="brand-mark">
             <Leaf size={20} aria-hidden="true" />
           </span>
@@ -1392,7 +1452,7 @@ export default function Storefront() {
           </p>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
             <a className="hero-cta" href="#juices">
-              सभी जूस देखें → <ChevronRight size={17} aria-hidden="true" />
+              See all Juices → <ChevronRight size={17} aria-hidden="true" />
             </a>
             {/* <a
               href="#cold-chain"
@@ -2289,16 +2349,17 @@ export default function Storefront() {
         </div>
         <div>
           <p className="eyebrow">
-            NATIONWIDE TEMPERATURE-CONTROLLED COLD-CHAIN
+            DOORSTEP FRESH DELIVERY · CURRENTLY IN BHIWANI (EXPANDING SOON
+            PAN-INDIA)
           </p>
           <h2>
             Delivered cold to your doorstep, <span>anywhere you are.</span>
           </h2>
           <p>
-            We deliver raw cold-pressed juices to homes, offices, and wellness
-            studios across all locations and PIN codes. Packed in recyclable
-            insulated coolers with food-grade gel chill packs so your juice
-            stays under 4°C until you crack open the glass bottle.
+            We deliver 100% raw packed juices to homes and offices across
+            Bhiwani (expanding across India soon). Freshly prepared with zero
+            added sugar and zero water, delivered fresh and cold to keep every
+            sip pure.
           </p>
         </div>
         <a href="#juices" className="text-link">
@@ -2308,33 +2369,35 @@ export default function Storefront() {
 
       {/* Purity & Craft Standards */}
       <section className="ingredients-section" id="standards">
-        <p className="eyebrow">THE ROOT & RITUAL PURITY GUARANTEE</p>
+        <p className="eyebrow">THE JUICEWALA PURITY GUARANTEE</p>
         <h2>Never heated. Never diluted. 100% Raw produce.</h2>
         <p>
-          Conventional store juices are boiled at high temperatures to extend
-          shelf-life, killing vital gut enzymes and vitamins. At Root & Ritual,
-          we cold-press living vegetables, roots, and fruits into recyclable
-          glass bottles, keeping biological vitality intact.
+          Conventional store juices are boiled or loaded with preservatives and
+          added sugar to extend shelf-life. At JuiceWala, we extract and pack
+          100% pure raw juice from fresh fruits and vegetables—zero water, zero
+          preservatives, keeping pure taste and vital nutrients intact.
         </p>
       </section>
 
       {/* Site Footer */}
       <footer className="site-footer">
-        <a className="brand footer-brand" href="#home">
+        <a
+          className="brand footer-brand"
+          href="#home"
+          aria-label="JuiceWala home"
+        >
           <span className="brand-mark">
             <Leaf size={18} aria-hidden="true" />
           </span>
-          <span>
-            root <i>&</i> ritual<span className="brand-dot">.</span>
-          </span>
+          <span>JuiceWala</span>
         </a>
         <p>
-          Root & Ritual Juice Co. · 100% Raw Cold-Pressed Juices Delivered
-          Nationwide.
+          JuiceWala · 100% Raw Packed Juices Delivered Fresh in Bhiwani
+          (Expanding Pan-India Soon).
         </p>
         <Link href="/contact">Support & Inquiries</Link>
         <a href="#cold-chain">
-          Cold-Chain Delivery <span>Across All Locations</span>
+          Cold Delivery <span>Bhiwani & Expanding Soon</span>
         </a>
       </footer>
 
@@ -2394,8 +2457,8 @@ export default function Storefront() {
                       gap: 6,
                     }}
                   >
-                    <Check size={16} /> You have unlocked FREE Nationwide
-                    Chilled Delivery!
+                    <Check size={16} /> You have unlocked FREE Chilled Doorstep
+                    Delivery!
                   </span>
                 ) : (
                   <span style={{ color: "#7a4e1d" }}>
@@ -2494,10 +2557,7 @@ export default function Storefront() {
                   Explore our 12 fresh-pressed botanical recipes and start your
                   daily wellness ritual.
                 </p>
-                <button
-                  className="pay-button"
-                  onClick={handleBrowseJuices}
-                >
+                <button className="pay-button" onClick={handleBrowseJuices}>
                   Browse Juices <ChevronRight size={17} />
                 </button>
               </div>
@@ -2558,7 +2618,7 @@ export default function Storefront() {
 
                 <p className="cart-delivery-note">
                   <Snowflake size={15} aria-hidden="true" />{" "}
-                  Temperature-guaranteed cold delivery across all PIN codes.
+                  Guaranteed fresh cold delivery across all areas in Bhiwani only.
                 </p>
 
                 <form className="checkout-form" onSubmit={submitOrder}>
@@ -2602,7 +2662,19 @@ export default function Storefront() {
                         name="city"
                         required
                         maxLength={50}
-                        placeholder="e.g. Delhi, Mumbai, Bhiwani"
+                        value={cityInput}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCityInput(val);
+                          if (
+                            val.trim() &&
+                            !isBhiwaniLocation(val, pincodeInput)
+                          ) {
+                            setRestrictedCityEntered(val.trim());
+                            setShowLocationRestrictionModal(true);
+                          }
+                        }}
+                        placeholder="Bhiwani"
                       />
                     </label>
 
@@ -2614,9 +2686,45 @@ export default function Storefront() {
                         required
                         pattern="[0-9]{6}"
                         maxLength={6}
-                        placeholder="6-digit PIN code"
+                        value={pincodeInput}
+                        onChange={(e) => {
+                          const val = e.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 6);
+                          setPincodeInput(val);
+                          if (val.length === 6 && !val.startsWith("127")) {
+                            setRestrictedCityEntered(
+                              cityInput.trim().toLowerCase() !== "bhiwani" &&
+                                cityInput.trim()
+                                ? cityInput.trim()
+                                : `PIN ${val}`,
+                            );
+                            setShowLocationRestrictionModal(true);
+                          }
+                        }}
+                        placeholder="e.g. 127021"
                       />
                     </label>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 11,
+                      color: "#275e33",
+                      background: "#f4f8ed",
+                      border: "1px solid #d9e7cb",
+                      borderRadius: 4,
+                      padding: "6px 10px",
+                      marginTop: -4,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <MapPin size={13} aria-hidden="true" />
+                    <span>
+                      Service currently available in <strong>Bhiwani only</strong> (PIN codes starting with 127)
+                    </span>
                   </div>
 
                   <label>
@@ -2631,47 +2739,6 @@ export default function Storefront() {
                       placeholder="House / Flat No., Street, Landmark, Area"
                     />
                   </label>
-
-                  {/* Delivery Slot Choice */}
-                  <fieldset
-                    className="payment-options"
-                    style={{ marginBottom: 14 }}
-                  >
-                    <legend>Preferred Delivery Slot</legend>
-                    <label className="payment-option">
-                      <input
-                        type="radio"
-                        name="slot"
-                        value="morning"
-                        checked={deliverySlot === "morning"}
-                        onChange={() => setDeliverySlot("morning")}
-                      />
-                      <span>
-                        <strong>Morning Fresh Drop (6 AM - 9 AM)</strong>
-                        <br />
-                        <small style={{ color: "var(--muted)" }}>
-                          Fresh start to your day
-                        </small>
-                      </span>
-                    </label>
-
-                    <label className="payment-option">
-                      <input
-                        type="radio"
-                        name="slot"
-                        value="express"
-                        checked={deliverySlot === "express"}
-                        onChange={() => setDeliverySlot("express")}
-                      />
-                      <span>
-                        <strong>Standard Daytime Chilled Express</strong>
-                        <br />
-                        <small style={{ color: "var(--muted)" }}>
-                          Insulated cold-box delivered during day
-                        </small>
-                      </span>
-                    </label>
-                  </fieldset>
 
                   {/* Payment Options */}
                   <fieldset className="payment-options">
@@ -2737,6 +2804,136 @@ export default function Storefront() {
               </>
             )}
           </aside>
+        </div>
+      )}
+
+      {/* Customer-Friendly Location Restriction Modal */}
+      {showLocationRestrictionModal && (
+        <div
+          className="drawer-backdrop"
+          style={{
+            zIndex: 1200,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={() => setShowLocationRestrictionModal(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="location-restriction-title"
+            style={{
+              background: "#ffffff",
+              borderRadius: 14,
+              maxWidth: 420,
+              width: "100%",
+              padding: "28px 24px 22px",
+              textAlign: "center",
+              boxShadow: "0 24px 48px rgba(0,0,0,0.3)",
+              border: "1px solid #e1ebda",
+              position: "relative",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setShowLocationRestrictionModal(false)}
+              aria-label="Close"
+              style={{
+                position: "absolute",
+                top: 14,
+                right: 14,
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: "#6b7d6e",
+                padding: 4,
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            <div
+              style={{
+                width: 58,
+                height: 58,
+                borderRadius: "50%",
+                background: "#f1f7e9",
+                color: "#183b2b",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 16px",
+              }}
+            >
+              <MapPin size={30} />
+            </div>
+
+            <h3
+              id="location-restriction-title"
+              style={{
+                margin: "0 0 10px",
+                fontSize: 21,
+                fontWeight: 700,
+                color: "#183b2b",
+              }}
+            >
+              Available in Bhiwani Only
+            </h3>
+
+            <p
+              style={{
+                margin: "0 0 10px",
+                fontSize: 14,
+                lineHeight: 1.55,
+                color: "#2f3d32",
+                fontWeight: 500,
+              }}
+            >
+              We are currently delivering our 100% fresh, raw packed juices
+              exclusively within <strong>Bhiwani</strong> (PIN codes starting
+              with <strong>127</strong>).
+            </p>
+
+            <p
+              style={{
+                margin: "0 0 22px",
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: "#6b7d6e",
+              }}
+            >
+              {restrictedCityEntered
+                ? `Thank you for your interest from ${restrictedCityEntered}! We are rapidly expanding our delivery network and will start serving your area very soon.`
+                : "Thank you for your interest! We will expand our doorstep cold delivery services to other cities across India soon."}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCityInput("Bhiwani");
+                if (pincodeInput && !pincodeInput.startsWith("127")) {
+                  setPincodeInput("");
+                }
+                setShowLocationRestrictionModal(false);
+              }}
+              style={{
+                width: "100%",
+                padding: "13px 20px",
+                background: "#183b2b",
+                color: "#f8fbf4",
+                border: "none",
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Deliver to Bhiwani
+            </button>
+          </div>
         </div>
       )}
 

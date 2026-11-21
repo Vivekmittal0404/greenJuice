@@ -3,21 +3,19 @@ import { ArrowLeft, Leaf, Mail, MessageCircle, Phone } from "lucide-react";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Contact Support | Root & Ritual",
-  description: "Contact Root & Ritual if you need help with your order.",
+  title: "Contact Support | JuiceWala",
+  description: "Contact JuiceWala if you need help with your order.",
 };
 
 export default function ContactPage() {
   return (
     <main className="contact-page">
       <header className="site-header">
-        <Link className="brand" href="/" aria-label="Root & Ritual home">
+        <Link className="brand" href="/" aria-label="JuiceWala home">
           <span className="brand-mark">
             <Leaf size={20} aria-hidden="true" />
           </span>
-          <span>
-            root <i>&</i> ritual<span className="brand-dot">.</span>
-          </span>
+          <span>JuiceWala</span>
         </Link>
         <Link className="contact-back-link" href="/">
           <ArrowLeft size={16} aria-hidden="true" />
@@ -27,7 +25,7 @@ export default function ContactPage() {
 
       <section className="support-section">
         <div className="support-heading">
-          <p className="eyebrow">ROOT & RITUAL · CUSTOMER CARE</p>
+          <p className="eyebrow">JUICEWALA · CUSTOMER CARE</p>
           <h1>Need a hand?</h1>
           <p>
             If you get stuck while ordering or need help with an existing order,
@@ -80,15 +78,13 @@ export default function ContactPage() {
       </section>
 
       <footer className="site-footer contact-footer">
-        <Link className="brand footer-brand" href="/">
+        <Link className="brand footer-brand" href="/" aria-label="JuiceWala home">
           <span className="brand-mark">
             <Leaf size={18} aria-hidden="true" />
           </span>
-          <span>
-            root <i>&</i> ritual<span className="brand-dot">.</span>
-          </span>
+          <span>JuiceWala</span>
         </Link>
-        <p>Doorstep cold-chain delivery nationwide across all cities & PIN codes.</p>
+        <p>Doorstep fresh juice delivery in Bhiwani (expanding across India soon).</p>
         <Link href="/">Return to the storefront</Link>
       </footer>
     </main>

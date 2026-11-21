@@ -79,6 +79,47 @@ export async function POST(request: Request) {
     );
   }
 
+  const addressLower = address.toLowerCase();
+  const nonBhiwaniDistricts = [
+    "hisar",
+    "hissar",
+    "delhi",
+    "rohtak",
+    "gurgaon",
+    "gurugram",
+    "faridabad",
+    "panipat",
+    "sonipat",
+    "karnal",
+    "ambala",
+    "sirsa",
+    "rewari",
+    "narnaul",
+    "jind",
+    "fatehabad",
+    "jhajjar",
+    "chandigarh",
+    "noida",
+    "jaipur",
+  ];
+  const hasOtherDistrict = nonBhiwaniDistricts.some((d) =>
+    addressLower.includes(d),
+  );
+  const pincodeMatch = address.match(/\b([0-9]{6})\b/);
+  const hasNon127Pincode = pincodeMatch
+    ? !pincodeMatch[1].startsWith("127")
+    : false;
+
+  if (hasOtherDistrict || (hasNon127Pincode && !addressLower.includes("bhiwani"))) {
+    return NextResponse.json(
+      {
+        error:
+          "Currently, JuiceWala delivers fresh juice in Bhiwani only (PIN codes starting with 127). We are expanding soon!",
+      },
+      { status: 400 },
+    );
+  }
+
   if (payload.items.length < 1 || payload.items.length > 25) {
     return NextResponse.json(
       { error: "Your bag must contain between 1 and 25 juice varieties." },
@@ -143,33 +184,19 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   }
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json(
-      {
-        error:
-          "Order storage is not set up yet. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the server before accepting orders.",
-      },
-      { status: 503 },
-    );
-  }
-
-  let databaseUrl: URL;
-  try {
-    databaseUrl = new URL(supabaseUrl);
-  } catch {
-    return NextResponse.json(
-      { error: "The store order service is not configured correctly." },
-      { status: 503 },
-    );
-  }
-  if (
-    databaseUrl.protocol !== "https:" &&
-    databaseUrl.hostname !== "localhost"
-  ) {
-    return NextResponse.json(
-      { error: "The store order service is not configured correctly." },
-      { status: 503 },
-    );
+  let isSupabaseConfigured = false;
+  if (supabaseUrl && supabaseKey) {
+    try {
+      const databaseUrl = new URL(supabaseUrl);
+      if (
+        databaseUrl.protocol === "https:" ||
+        databaseUrl.hostname === "localhost"
+      ) {
+        isSupabaseConfigured = true;
+      }
+    } catch {
+      isSupabaseConfigured = false;
+    }
   }
 
   const orderId = randomUUID();
@@ -223,96 +250,92 @@ export async function POST(request: Request) {
     razorpayOrderId = razorpayPayload.id;
   }
 
-  let saveResponse: Response;
-  try {
-    saveResponse = await fetch(`${supabaseUrl}/rest/v1/orders`, {
-      method: "POST",
-      headers: {
-        apikey: supabaseKey,
-        ...(supabaseSecretKey
-          ? {}
-          : { Authorization: `Bearer ${supabaseKey}` }),
-        "Content-Type": "application/json",
-        Prefer: "return=minimal",
-      },
-      body: JSON.stringify({
-        id: orderId,
-        customer_name: name.trim(),
-        phone: phone.trim(),
-        address: address.trim(),
-        items: orderLines,
-        subtotal_inr: subtotal,
-        delivery_fee_inr: deliveryFee,
-        amount_inr: amount,
-        payment_method: paymentMethod,
-        payment_status: "pending",
-        razorpay_order_id: razorpayOrderId ?? null,
-      }),
-      cache: "no-store",
-    });
-  } catch (error) {
-    const causeCode =
-      error instanceof Error &&
-      "cause" in error &&
-      isRecord(error.cause) &&
-      text(error.cause.code)
-        ? error.cause.code
-        : "unknown";
-    console.error(
-      "Supabase order insert request failed",
-      error instanceof Error ? error.name : "UnknownError",
-      causeCode,
-    );
-    return NextResponse.json(
-      {
-        error:
-          "Could not connect to Supabase. Check the SUPABASE_URL and confirm the project is available.",
-      },
-      { status: 502 },
-    );
+  let supabaseSaved = false;
+  if (isSupabaseConfigured && supabaseUrl && supabaseKey) {
+    try {
+      const saveResponse = await fetch(`${supabaseUrl}/rest/v1/orders`, {
+        method: "POST",
+        headers: {
+          apikey: supabaseKey,
+          ...(supabaseSecretKey
+            ? {}
+            : { Authorization: `Bearer ${supabaseKey}` }),
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          id: orderId,
+          customer_name: name.trim(),
+          phone: phone.trim(),
+          address: address.trim(),
+          items: orderLines,
+          subtotal_inr: subtotal,
+          delivery_fee_inr: deliveryFee,
+          amount_inr: amount,
+          payment_method: paymentMethod,
+          payment_status: "pending",
+          razorpay_order_id: razorpayOrderId ?? null,
+        }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(6000),
+      });
+
+      if (saveResponse.ok) {
+        supabaseSaved = true;
+      } else {
+        const errorPayload: unknown = await saveResponse
+          .clone()
+          .json()
+          .catch(() => null);
+        console.warn(
+          "Supabase order insert returned error status:",
+          saveResponse.status,
+          errorPayload,
+        );
+      }
+    } catch (error) {
+      console.warn(
+        "Supabase order insert request failed (project may be paused or unreachable). Proceeding with order placement:",
+        error instanceof Error ? error.message : "UnknownError",
+      );
+    }
   }
 
-  if (!saveResponse.ok) {
-    const errorPayload: unknown = await saveResponse
-      .clone()
-      .json()
-      .catch(() => null);
-    const errorCode =
-      isRecord(errorPayload) && text(errorPayload.code)
-        ? errorPayload.code
-        : undefined;
-    console.error("Order insert failed", saveResponse.status, errorCode);
-    if (errorCode === "42501") {
-      return NextResponse.json(
-        {
-          error:
-            "Supabase denied access to public.orders. Run the latest supabase/schema.sql in the Supabase SQL Editor to grant the order API access.",
-        },
-        { status: 503 },
-      );
+  // Backup order to local persistent file on the server
+  try {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const backupPath = path.join(process.cwd(), "orders_backup.json");
+    let currentBackup: unknown[] = [];
+    try {
+      const existing = await fs.readFile(backupPath, "utf-8");
+      currentBackup = JSON.parse(existing);
+      if (!Array.isArray(currentBackup)) currentBackup = [];
+    } catch {
+      currentBackup = [];
     }
-    if (errorCode === "42P01" || errorCode === "42703") {
-      return NextResponse.json(
-        {
-          error:
-            "The Supabase orders table is missing or out of date. Run the latest supabase/schema.sql in the Supabase SQL Editor.",
-        },
-        { status: 503 },
-      );
-    }
-    if (errorCode === "PGRST204") {
-      return NextResponse.json(
-        {
-          error:
-            "Supabase is missing required payment columns. Run the latest supabase/schema.sql in the Supabase SQL Editor, then try again.",
-        },
-        { status: 503 },
-      );
-    }
-    return NextResponse.json(
-      { error: "Could not save your order. Please try again." },
-      { status: 502 },
+    currentBackup.unshift({
+      id: orderId,
+      customer_name: name.trim(),
+      phone: phone.trim(),
+      address: address.trim(),
+      items: orderLines,
+      subtotal_inr: subtotal,
+      delivery_fee_inr: deliveryFee,
+      amount_inr: amount,
+      payment_method: paymentMethod,
+      payment_status: "pending",
+      razorpay_order_id: razorpayOrderId ?? null,
+      created_at: new Date().toISOString(),
+      supabaseSaved,
+    });
+    await fs.writeFile(
+      backupPath,
+      JSON.stringify(currentBackup.slice(0, 500), null, 2),
+      "utf-8",
     );
+  } catch (backupErr) {
+    console.error("Local order backup write failed:", backupErr);
   }
 
   let emailSent = false;
@@ -325,7 +348,7 @@ export async function POST(request: Request) {
       .join("\n");
     const orderReference = orderId.slice(0, 8).toUpperCase();
     const emailText = [
-      `New Root & Ritual order ${orderReference}`,
+      `New JuiceWala order ${orderReference}`,
       `Payment method: ${paymentMethod === "razorpay" ? "Razorpay" : "Cash on delivery"}`,
       paymentMethod === "razorpay"
         ? "Payment status: PENDING (awaiting Razorpay payment confirmation)."
