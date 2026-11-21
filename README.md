@@ -1,6 +1,8 @@
-# Root & Ritual
+# Root & Ritual Juice Co.
 
-A responsive juice storefront built with Next.js. Customers in Bhiwani can order Green Juice (Rs 60) or Sweet Lime Juice (Rs 100) per medium glass, submit delivery details, and pay securely with Razorpay or choose cash on delivery. Delivery is Rs 40 per order. New orders are stored in Supabase with payment status `pending`.
+A modern raw cold-pressed juice startup built with Next.js. Delivers 100% living, raw, cold-pressed juices, immunity tonics, and detox blends nationwide in temperature-controlled insulated cold packaging with food-grade gel chill packs.
+
+Customers across all PIN codes and cities can explore 12 distinct cold-pressed blends, filter by wellness categories, inspect full ingredient stories and nutritional profiles, submit delivery addresses with preferred delivery slots (Morning 6-9 AM or Daytime Express), and pay securely via Razorpay (UPI, cards, netbanking) or choose cash on delivery (COD). Free delivery is offered on orders of ₹499 or more (otherwise ₹40 cold-shipping fee). New orders are stored in Supabase with payment status `pending`.
 
 The shopping bag and a local order history persist in the current browser. The “My orders” list is device-local (not synced across browsers or devices), and clearing browser storage removes it; order records remain in Supabase for the store.
 
@@ -23,7 +25,7 @@ Open `http://localhost:3000`.
 
 Deploy this Next.js app to Vercel or another Node.js host. Add the Razorpay, Supabase, and Resend values as server environment variables in the hosting dashboard, apply the schema, and redeploy. The production build command is `npm run build`; the start command is `npm run start`.
 
-The order API validates customer details, looks up prices on the server, adds a flat Rs 40 delivery charge, and saves the order and payment method. Razorpay orders are created server-side; payment signatures are verified and the payment must be captured before the order is marked paid. COD orders are due in cash on delivery. Orders can be placed at any time; **delivery can be attempted from 6 AM to 8 AM**. Service is currently limited to Bhiwani; more areas are coming soon.
+The order API validates customer details, looks up prices on the server, calculates cold-chain delivery fees (free on orders >= ₹499), and saves the order and payment method. Razorpay orders are created server-side; payment signatures are verified and the payment must be captured before the order is marked paid. COD orders are due in cash on delivery. Orders can be placed at any time with choices for early morning (6 AM - 9 AM) or standard daytime delivery slots across all locations.
 
 Razorpay checkout requires `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `SUPABASE_URL`, and `SUPABASE_SECRET_KEY` (or the legacy `SUPABASE_SERVICE_ROLE_KEY`). If any are missing, checkout explains the required setup and will not accept an order that cannot be recorded or paid to the configured merchant. The order email is sent only after the order is saved; if Resend settings are missing or the email is rejected, checkout continues and shows a notification warning.
 

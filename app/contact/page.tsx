@@ -88,7 +88,7 @@ export default function ContactPage() {
             root <i>&</i> ritual<span className="brand-dot">.</span>
           </span>
         </Link>
-        <p>Serving Bhiwani only. More areas coming soon.</p>
+        <p>Doorstep cold-chain delivery nationwide across all cities & PIN codes.</p>
         <Link href="/">Return to the storefront</Link>
       </footer>
     </main>

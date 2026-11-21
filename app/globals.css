@@ -814,6 +814,94 @@ textarea:focus-visible {
 .saved-order-total strong {
   color: var(--forest);
 }
+.saved-order-customer {
+  margin: 6px 0 8px;
+  padding: 6px 8px;
+  background: #f7f9f4;
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.saved-order-customer strong {
+  color: var(--forest);
+}
+.order-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin: 7px 0 9px;
+}
+.order-status-badge.paid {
+  background: #eaf4df;
+  color: #235c2e;
+}
+.order-status-badge.pending {
+  background: #fff5e5;
+  color: #935a1a;
+}
+.order-status-badge.cod {
+  background: #e6f0f5;
+  color: #1a5670;
+}
+.order-status-badge.cancelled {
+  background: #fde8e8;
+  color: #9c2121;
+}
+.saved-order-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px dashed var(--line);
+}
+.order-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  transition: all 0.15s ease;
+}
+.order-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.order-action-btn.edit {
+  border: 1px solid var(--forest);
+  color: var(--forest);
+}
+.order-action-btn.edit:hover:not(:disabled) {
+  background: var(--forest);
+  color: #fff;
+}
+.order-action-btn.cancel {
+  border: 1px solid #d9773b;
+  color: #d9773b;
+}
+.order-action-btn.cancel:hover:not(:disabled) {
+  background: #d9773b;
+  color: #fff;
+}
+.order-action-btn.delete {
+  border: 1px solid #c93b3b;
+  color: #c93b3b;
+}
+.order-action-btn.delete:hover:not(:disabled) {
+  background: #c93b3b;
+  color: #fff;
+}
 .icon-button {
   width: 38px;
   height: 38px;

@@ -2,8 +2,19 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 const catalog: Record<string, { name: string; price: number }> = {
-  "green-juice": { name: "Green Juice", price: 60 },
-  "sweet-lime": { name: "Sweet Lime Juice", price: 100 },
+  "green-juice": { name: "Herbal Green Vitality", price: 60 },
+  "sweet-lime": { name: "Pure Sweet Lime (Mosambi)", price: 100 },
+  "celery-detox": { name: "Celery Deep Cleanse", price: 110 },
+  "ruby-roots": { name: "Ruby Roots (Beet & Carrot)", price: 90 },
+  "valencia-orange": { name: "Valencia Sunshine Orange", price: 110 },
+  "pomegranate-pure": { name: "Royal Pomegranate Elixir", price: 130 },
+  "watermelon-mint": { name: "Crimson Watermelon & Mint", price: 80 },
+  "golden-glow": { name: "Golden Carrot & Ginger", price: 90 },
+  "coconut-aloe": { name: "Tender Coconut & Aloe Vera", price: 95 },
+  "pineapple-digest": { name: "Pineapple Bromelain Digest", price: 100 },
+  "ginger-immunity-shot": { name: "Fiery Ginger & Turmeric Tonic", price: 70 },
+  "jamun-metabolic": { name: "Wild Jamun & Amla Balance", price: 110 },
+  "sugarcane-pure": { name: "Pure Sugarcane (ताज़ा गन्ने का जूस)", price: 60 },
 };
 
 type OrderLine = {
@@ -68,9 +79,9 @@ export async function POST(request: Request) {
     );
   }
 
-  if (payload.items.length < 1 || payload.items.length > 8) {
+  if (payload.items.length < 1 || payload.items.length > 25) {
     return NextResponse.json(
-      { error: "Your bag must contain between 1 and 8 juice varieties." },
+      { error: "Your bag must contain between 1 and 25 juice varieties." },
       { status: 400 },
     );
   }
@@ -86,16 +97,16 @@ export async function POST(request: Request) {
     }
     const product = catalog[item.id];
     const quantity = item.quantity as number;
-    if (!product || quantity < 1 || quantity > 12) {
+    if (!product || quantity < 1 || quantity > 24) {
       return NextResponse.json(
         { error: "One of the selected quantities is not available." },
         { status: 400 },
       );
     }
     bottleCount += quantity;
-    if (bottleCount > 24) {
+    if (bottleCount > 60) {
       return NextResponse.json(
-        { error: "An order can contain up to 24 bottles." },
+        { error: "An order can contain up to 60 bottles." },
         { status: 400 },
       );
     }
@@ -111,7 +122,7 @@ export async function POST(request: Request) {
     (sum, item) => sum + item.unitPrice * item.quantity,
     0,
   );
-  const deliveryFee = 40;
+  const deliveryFee = subtotal >= 499 ? 0 : 40;
   const amount = subtotal + deliveryFee;
   const razorpayKeyId = process.env.RAZORPAY_KEY_ID?.trim();
   const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
@@ -330,7 +341,8 @@ export async function POST(request: Request) {
       `Subtotal: Rs ${subtotal}`,
       `Delivery: Rs ${deliveryFee}`,
       `Total: Rs ${amount}`,
-      "Delivery attempts are between 6 AM and 8 AM.",
+      "Packaging: Insulated Cold-Box with gel chill packs (Delivered Fresh).",
+      "Delivery window: Express Morning Slot (6 AM - 9 AM) or Priority Daytime Delivery.",
     ].join("\n");
     try {
       const emailResponse = await fetch("https://api.resend.com/emails", {

@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Root & Ritual | Fresh herbal juice",
+  title: "Root & Ritual | 100% Raw Cold-Pressed Juices Delivered Everywhere",
   description:
-    "Fresh herbal juice blends made with real roots, bright fruit and familiar ingredients.",
+    "Direct-to-doorstep raw cold-pressed juices, immunity boosters, and detox cleanses. Zero added sugar, zero water, 100% pure living produce delivered nationwide in temperature-controlled cold packs.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
