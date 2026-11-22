@@ -2,7 +2,6 @@
 
 import {
   useState,
-  useEffect,
   useSyncExternalStore,
   type FormEvent,
 } from "react";
@@ -11,25 +10,21 @@ import {
   ArrowDown,
   Ban,
   Check,
-  CheckCircle2,
   ChevronRight,
   ClipboardList,
   Droplets,
   Info,
   Leaf,
-  LogOut,
   MapPin,
   Minus,
   Pencil,
   Plus,
   Search,
-  ShieldCheck,
   ShoppingBag,
   Snowflake,
   Sparkles,
   Trash2,
   Truck,
-  User,
   X,
 } from "lucide-react";
 import Script from "next/script";
@@ -844,190 +839,6 @@ export default function Storefront() {
     useState(false);
   const [restrictedCityEntered, setRestrictedCityEntered] = useState("");
 
-  // Mobile Number & OTP Authentication State
-  const [currentUser, setCurrentUser] = useState<{ phone: string } | null>(
-    null,
-  );
-  const [authToken, setAuthToken] = useState("");
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authPhone, setAuthPhone] = useState("");
-  const [authOtp, setAuthOtp] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
-  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-  const [authError, setAuthError] = useState("");
-  const [authSuccessMsg, setAuthSuccessMsg] = useState("");
-  const [otpCooldown, setOtpCooldown] = useState(0);
-  const [demoOtpNotice, setDemoOtpNotice] = useState<string | null>(null);
-
-  // Check user session on initial mount
-  useEffect(() => {
-    let isMounted = true;
-    async function checkAuthSession() {
-      try {
-        const cachedToken = localStorage.getItem("juicewala_token") || "";
-        const cachedPhone = localStorage.getItem("juicewala_phone") || "";
-
-        const res = await fetch("/api/auth/me", {
-          headers: cachedToken ? { Authorization: `Bearer ${cachedToken}` } : {},
-        });
-        const data = (await res.json()) as {
-          loggedIn?: boolean;
-          phone?: string;
-        };
-
-        if (!isMounted) return;
-
-        if (data.loggedIn && data.phone) {
-          setCurrentUser({ phone: data.phone });
-          setAuthToken(cachedToken);
-        } else if (cachedToken && cachedPhone) {
-          setCurrentUser({ phone: cachedPhone });
-          setAuthToken(cachedToken);
-        } else {
-          setCurrentUser(null);
-        }
-      } catch {
-        if (isMounted) {
-          try {
-            const cachedPhone = localStorage.getItem("juicewala_phone") || "";
-            const cachedToken = localStorage.getItem("juicewala_token") || "";
-            if (cachedPhone && cachedToken) {
-              setCurrentUser({ phone: cachedPhone });
-              setAuthToken(cachedToken);
-            }
-          } catch {}
-        }
-      }
-    }
-
-    void checkAuthSession();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Cooldown countdown timer for Resend OTP
-  useEffect(() => {
-    if (otpCooldown <= 0) return;
-    const interval = setInterval(() => {
-      setOtpCooldown((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [otpCooldown]);
-
-  async function handleSendOtp(targetPhone?: string) {
-    const phoneToSend = (targetPhone || authPhone).trim();
-    if (!/^[6-9][0-9]{9}$/.test(phoneToSend)) {
-      setAuthError("Please enter a valid 10-digit mobile number.");
-      return;
-    }
-    setAuthError("");
-    setAuthSuccessMsg("");
-    setDemoOtpNotice(null);
-    setIsSendingOtp(true);
-
-    try {
-      const res = await fetch("/api/auth/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phoneToSend }),
-      });
-      const data = (await res.json()) as {
-        success?: boolean;
-        error?: string;
-        message?: string;
-        cooldownSeconds?: number;
-        demoOtp?: string;
-      };
-
-      if (!res.ok || !data.success) {
-        setAuthError(data.error || "Could not send OTP. Please try again.");
-        if (data.cooldownSeconds) {
-          setOtpCooldown(data.cooldownSeconds);
-        }
-      } else {
-        setOtpSent(true);
-        setOtpCooldown(30);
-        setAuthSuccessMsg(data.message || `OTP sent to +91 ${phoneToSend}`);
-        if (data.demoOtp) {
-          setDemoOtpNotice(data.demoOtp);
-        }
-      }
-    } catch {
-      setAuthError("Network error. Please check your connection.");
-    } finally {
-      setIsSendingOtp(false);
-    }
-  }
-
-  async function handleVerifyOtp(targetPhone?: string, targetOtp?: string) {
-    const phoneToVerify = (targetPhone || authPhone).trim();
-    const otpToVerify = (targetOtp || authOtp).trim();
-
-    if (!/^[6-9][0-9]{9}$/.test(phoneToVerify)) {
-      setAuthError("Please enter a valid 10-digit mobile number.");
-      return;
-    }
-    if (!/^[0-9]{6}$/.test(otpToVerify)) {
-      setAuthError("Please enter the 6-digit OTP received.");
-      return;
-    }
-
-    setAuthError("");
-    setAuthSuccessMsg("");
-    setIsVerifyingOtp(true);
-
-    try {
-      const res = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phoneToVerify, otp: otpToVerify }),
-      });
-      const data = (await res.json()) as {
-        success?: boolean;
-        error?: string;
-        token?: string;
-        phone?: string;
-      };
-
-      if (!res.ok || !data.success) {
-        setAuthError(data.error || "Incorrect OTP. Please try again.");
-      } else {
-        const user = { phone: data.phone || phoneToVerify };
-        setCurrentUser(user);
-        setAuthToken(data.token || "");
-        try {
-          localStorage.setItem("juicewala_token", data.token || "");
-          localStorage.setItem("juicewala_phone", user.phone);
-        } catch {}
-        setIsAuthModalOpen(false);
-        setOtpSent(false);
-        setAuthOtp("");
-        setDemoOtpNotice(null);
-      }
-    } catch {
-      setAuthError("Network error. Please try again.");
-    } finally {
-      setIsVerifyingOtp(false);
-    }
-  }
-
-  async function handleLogout() {
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-    } catch {}
-    setCurrentUser(null);
-    setAuthToken("");
-    try {
-      localStorage.removeItem("juicewala_token");
-      localStorage.removeItem("juicewala_phone");
-    } catch {}
-    setOtpSent(false);
-    setAuthOtp("");
-    setDemoOtpNotice(null);
-  }
-
   function isBhiwaniLocation(city: string, pin: string): boolean {
     const cleanCity = city.trim().toLowerCase();
     const cleanPin = pin.trim();
@@ -1230,18 +1041,6 @@ export default function Storefront() {
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-
-    if (!currentUser) {
-      setAuthError(
-        "Please login with your mobile number and verify OTP to confirm your order.",
-      );
-      setError(
-        "Please login with your mobile number and verify OTP to confirm your order.",
-      );
-      setIsAuthModalOpen(true);
-      return;
-    }
-
     setIsSubmitting(true);
     const formData = new FormData(event.currentTarget);
     const orderedItems = cartItems.map(({ id, quantity }) => ({
@@ -1250,7 +1049,7 @@ export default function Storefront() {
     }));
 
     const name = (formData.get("name") as string) || "";
-    const phone = currentUser.phone;
+    const phone = (formData.get("phone") as string) || "";
     const city = (formData.get("city") as string) || "";
     const pincode = (formData.get("pincode") as string) || "";
     const streetAddress = (formData.get("address") as string) || "";
@@ -1271,17 +1070,10 @@ export default function Storefront() {
 
     const fullAddress = `${streetAddress.trim()}, ${city.trim()} - ${pincode.trim()}`;
 
-    const orderHeaders: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (authToken) {
-      orderHeaders["Authorization"] = `Bearer ${authToken}`;
-    }
-
     try {
       const response = await fetch("/api/orders", {
         method: "POST",
-        headers: orderHeaders,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customer: {
             name: name.trim(),
@@ -1296,16 +1088,6 @@ export default function Storefront() {
       const result = (await response.json()) as
         | CreatedOrder
         | { error: string };
-
-      if (response.status === 401) {
-        setCurrentUser(null);
-        setIsAuthModalOpen(true);
-        throw new Error(
-          "error" in result
-            ? result.error
-            : "Please verify your mobile number with OTP before placing an order.",
-        );
-      }
 
       if (!response.ok || !("orderId" in result)) {
         throw new Error(
@@ -1686,39 +1468,6 @@ export default function Storefront() {
         </nav>
 
         <div className="header-actions">
-          {currentUser ? (
-            <div className="auth-header-pill">
-              <span
-                className="auth-user-tag"
-                title={`Logged in: +91 ${currentUser.phone}`}
-              >
-                <User size={15} aria-hidden="true" />
-                <span>+91 {currentUser.phone}</span>
-              </span>
-              <button
-                className="auth-logout-icon-btn"
-                onClick={handleLogout}
-                title="Logout / Switch Account"
-                aria-label="Logout"
-              >
-                <LogOut size={14} aria-hidden="true" />
-              </button>
-            </div>
-          ) : (
-            <button
-              className="auth-nav-btn"
-              onClick={() => {
-                setAuthError("");
-                setAuthSuccessMsg("");
-                setIsAuthModalOpen(true);
-              }}
-              aria-label="Login with mobile number"
-            >
-              <User size={17} aria-hidden="true" />
-              <span>Login</span>
-            </button>
-          )}
-
           <button className="orders-button" onClick={openOrders}>
             <ClipboardList size={18} aria-hidden="true" />
             <span>My orders</span>
@@ -3065,194 +2814,34 @@ export default function Storefront() {
                   cold delivery across all areas in Bhiwani only.
                 </p>
 
-                {!currentUser ? (
-                  <div className="checkout-auth-card">
-                    <div className="checkout-auth-header">
-                      <div className="checkout-auth-icon-wrap">
-                        <ShieldCheck size={22} aria-hidden="true" />
-                      </div>
-                      <div>
-                        <h3>Login to Confirm Order</h3>
-                        <p>
-                          Verify your 10-digit mobile number with OTP before placing your cold juice order.
-                        </p>
-                      </div>
-                    </div>
+                <form className="checkout-form" onSubmit={submitOrder}>
+                  <p className="eyebrow">
+                    WHERE SHOULD WE DELIVER YOUR JUICE?
+                  </p>
 
-                    {!otpSent ? (
-                      <div className="checkout-auth-body">
-                        <label className="checkout-auth-label">
-                          10-digit Mobile number
-                          <div className="phone-prefix-group">
-                            <span className="phone-prefix">+91</span>
-                            <input
-                              type="tel"
-                              inputMode="numeric"
-                              maxLength={10}
-                              value={authPhone}
-                              onChange={(e) =>
-                                setAuthPhone(e.target.value.replace(/\D/g, ""))
-                              }
-                              placeholder="Enter 10-digit mobile number"
-                              className="auth-input-phone"
-                            />
-                          </div>
-                        </label>
+                  <label>
+                    Full name
+                    <input
+                      autoComplete="name"
+                      name="name"
+                      required
+                      maxLength={80}
+                      placeholder="Receiver's name"
+                    />
+                  </label>
 
-                        {authError && (
-                          <p className="auth-error-msg">{authError}</p>
-                        )}
-                        {authSuccessMsg && (
-                          <p className="auth-success-msg">{authSuccessMsg}</p>
-                        )}
-
-                        <button
-                          type="button"
-                          className="auth-primary-btn"
-                          disabled={isSendingOtp || authPhone.length !== 10}
-                          onClick={() => handleSendOtp()}
-                        >
-                          {isSendingOtp
-                            ? "Sending OTP..."
-                            : "Send OTP to Mobile"}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="checkout-auth-body">
-                        <div className="auth-phone-tag">
-                          <span>
-                            OTP sent to <strong>+91 {authPhone}</strong>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOtpSent(false);
-                              setAuthOtp("");
-                              setAuthError("");
-                              setDemoOtpNotice(null);
-                            }}
-                            className="auth-change-link"
-                          >
-                            Change Number
-                          </button>
-                        </div>
-
-                        {demoOtpNotice && (
-                          <div className="demo-otp-banner">
-                            <span>
-                              Demo Mode OTP: <strong>{demoOtpNotice}</strong>
-                            </span>
-                            <button
-                              type="button"
-                              className="demo-autofill-btn"
-                              onClick={() => setAuthOtp(demoOtpNotice)}
-                            >
-                              Auto-fill OTP
-                            </button>
-                          </div>
-                        )}
-
-                        <label className="checkout-auth-label">
-                          Enter 6-digit OTP
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            maxLength={6}
-                            value={authOtp}
-                            onChange={(e) =>
-                              setAuthOtp(e.target.value.replace(/\D/g, ""))
-                            }
-                            placeholder="Enter 6-digit code"
-                            className="auth-input-otp"
-                            autoFocus
-                          />
-                        </label>
-
-                        {authError && (
-                          <p className="auth-error-msg">{authError}</p>
-                        )}
-                        {authSuccessMsg && (
-                          <p className="auth-success-msg">{authSuccessMsg}</p>
-                        )}
-
-                        <div className="auth-actions-row">
-                          <button
-                            type="button"
-                            className="auth-primary-btn"
-                            disabled={isVerifyingOtp || authOtp.length !== 6}
-                            onClick={() => handleVerifyOtp()}
-                          >
-                            {isVerifyingOtp
-                              ? "Verifying..."
-                              : "Verify OTP & Continue"}
-                          </button>
-
-                          <button
-                            type="button"
-                            className="auth-resend-btn"
-                            disabled={otpCooldown > 0 || isSendingOtp}
-                            onClick={() => handleSendOtp()}
-                          >
-                            {otpCooldown > 0
-                              ? `Resend in ${otpCooldown}s`
-                              : "Resend OTP"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <div className="checkout-logged-in-bar">
-                      <div className="logged-in-info">
-                        <CheckCircle2
-                          size={16}
-                          className="logged-in-check"
-                          aria-hidden="true"
-                        />
-                        <span>
-                          Verified Mobile:{" "}
-                          <strong>+91 {currentUser.phone}</strong>
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleLogout}
-                        className="logged-in-logout-link"
-                        title="Logout / Change number"
-                      >
-                        Change
-                      </button>
-                    </div>
-
-                    <form className="checkout-form" onSubmit={submitOrder}>
-                      <p className="eyebrow">
-                        WHERE SHOULD WE DELIVER YOUR JUICE?
-                      </p>
-
-                      <label>
-                        Full name
-                        <input
-                          autoComplete="name"
-                          name="name"
-                          required
-                          maxLength={80}
-                          placeholder="Receiver's name"
-                        />
-                      </label>
-
-                      <label>
-                        10-digit Mobile number (Verified)
-                        <input
-                          autoComplete="tel"
-                          name="phone"
-                          type="tel"
-                          required
-                          readOnly
-                          value={currentUser.phone}
-                          className="input-verified-locked"
-                        />
-                      </label>
+                  <label>
+                    10-digit Mobile number
+                    <input
+                      autoComplete="tel"
+                      name="phone"
+                      type="tel"
+                      required
+                      pattern="[0-9]{10}"
+                      maxLength={10}
+                      placeholder="e.g. 9876543210"
+                    />
+                  </label>
 
                   <div
                     style={{
@@ -3410,8 +2999,6 @@ export default function Storefront() {
                 </form>
               </>
             )}
-          </>
-        )}
           </aside>
         </div>
       )}
@@ -4107,166 +3694,6 @@ export default function Storefront() {
             <X size={16} />
           </button>
         </aside>
-      )}
-
-      {/* Standalone Login / Sign Up Modal */}
-      {isAuthModalOpen && (
-        <div
-          className="drawer-backdrop"
-          style={{
-            zIndex: 1200,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-          }}
-          onMouseDown={(e) =>
-            e.target === e.currentTarget && setIsAuthModalOpen(false)
-          }
-        >
-          <div
-            className="auth-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="auth-modal-title"
-          >
-            <div className="auth-modal-header">
-              <div className="auth-modal-header-left">
-                <div className="auth-modal-icon-badge">
-                  <ShieldCheck size={24} aria-hidden="true" />
-                </div>
-                <div>
-                  <h3 id="auth-modal-title">JuiceWala Login / Sign Up</h3>
-                  <p className="auth-modal-subtitle">
-                    Enter your mobile number to sign in or create an account with OTP
-                  </p>
-                </div>
-              </div>
-              <button
-                className="icon-button modal-close"
-                onClick={() => setIsAuthModalOpen(false)}
-                aria-label="Close login dialog"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {!otpSent ? (
-              <div className="auth-modal-body">
-                <label className="checkout-auth-label">
-                  10-digit Mobile number
-                  <div className="phone-prefix-group">
-                    <span className="phone-prefix">+91</span>
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={10}
-                      value={authPhone}
-                      onChange={(e) =>
-                        setAuthPhone(e.target.value.replace(/\D/g, ""))
-                      }
-                      placeholder="Enter mobile number"
-                      className="auth-input-phone"
-                      autoFocus
-                    />
-                  </div>
-                </label>
-
-                {authError && <p className="auth-error-msg">{authError}</p>}
-                {authSuccessMsg && (
-                  <p className="auth-success-msg">{authSuccessMsg}</p>
-                )}
-
-                <button
-                  type="button"
-                  className="auth-primary-btn"
-                  disabled={isSendingOtp || authPhone.length !== 10}
-                  onClick={() => handleSendOtp()}
-                >
-                  {isSendingOtp ? "Sending OTP..." : "Get OTP on Mobile →"}
-                </button>
-              </div>
-            ) : (
-              <div className="auth-modal-body">
-                <div className="auth-phone-tag">
-                  <span>
-                    OTP sent to <strong>+91 {authPhone}</strong>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOtpSent(false);
-                      setAuthOtp("");
-                      setAuthError("");
-                      setDemoOtpNotice(null);
-                    }}
-                    className="auth-change-link"
-                  >
-                    Change Number
-                  </button>
-                </div>
-
-                {demoOtpNotice && (
-                  <div className="demo-otp-banner">
-                    <span>
-                      Demo Mode OTP: <strong>{demoOtpNotice}</strong>
-                    </span>
-                    <button
-                      type="button"
-                      className="demo-autofill-btn"
-                      onClick={() => setAuthOtp(demoOtpNotice)}
-                    >
-                      Auto-fill OTP
-                    </button>
-                  </div>
-                )}
-
-                <label className="checkout-auth-label">
-                  Enter 6-digit OTP
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={authOtp}
-                    onChange={(e) =>
-                      setAuthOtp(e.target.value.replace(/\D/g, ""))
-                    }
-                    placeholder="Enter 6-digit code"
-                    className="auth-input-otp"
-                    autoFocus
-                  />
-                </label>
-
-                {authError && <p className="auth-error-msg">{authError}</p>}
-                {authSuccessMsg && (
-                  <p className="auth-success-msg">{authSuccessMsg}</p>
-                )}
-
-                <div className="auth-actions-row">
-                  <button
-                    type="button"
-                    className="auth-primary-btn"
-                    disabled={isVerifyingOtp || authOtp.length !== 6}
-                    onClick={() => handleVerifyOtp()}
-                  >
-                    {isVerifyingOtp ? "Verifying..." : "Verify & Sign In"}
-                  </button>
-
-                  <button
-                    type="button"
-                    className="auth-resend-btn"
-                    disabled={otpCooldown > 0 || isSendingOtp}
-                    onClick={() => handleSendOtp()}
-                  >
-                    {otpCooldown > 0
-                      ? `Resend in ${otpCooldown}s`
-                      : "Resend OTP"}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
       )}
     </main>
   );
