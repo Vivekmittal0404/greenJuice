@@ -236,7 +236,7 @@ export const products: Product[] = [
       vitaminC: "120% RDA",
       sugar: "0g Added Sugar",
     },
-    price: 100,
+    price: 50,
     image:
       "https://images.unsplash.com/photo-1607690506833-498e04ab3ffa?auto=format&fit=crop&w=900&q=85",
     color: "#e6b333",
@@ -308,7 +308,7 @@ export const products: Product[] = [
       vitaminC: "95% RDA",
       sugar: "0g Added Sugar",
     },
-    price: 90,
+    price: 30,
     image:
       "https://images.unsplash.com/photo-1597748770074-fe9655bb0522?auto=format&fit=crop&w=900&q=85",
     color: "#8c1b33",
@@ -383,7 +383,7 @@ export const products: Product[] = [
       vitaminC: "110% RDA",
       sugar: "0g Added Sugar",
     },
-    price: 130,
+    price: 150,
     image: "/images/pomegranate.webp",
     color: "#7d1629",
     hoverNote:
@@ -428,6 +428,211 @@ export const products: Product[] = [
     hoverNote:
       "100% natural fresh sugarcane juice with ginger, mint, and lemon. No water added.",
     tag: "Natural Energy",
+    volume: "300 ml",
+  },
+  {
+    id: "banana-shake",
+    name: "Fresh Banana Shake (ताज़ा केला शेक)",
+    subtitle: "Rich & Creamy Energy Shake",
+    category: "wellness",
+    categoryLabel: "Shakes & Smoothies",
+    description:
+      "Thick, creamy, and wholesome banana shake prepared with naturally ripe bananas and pure chilled milk. Rich in natural sweetness, dietary fiber, and potassium to give you instant, lasting energy.",
+    fullStory:
+      "Made by blending golden ripe bananas with chilled wholesome milk, a pinch of fragrant green cardamom, and a touch of honey. No artificial flavors or heavy syrups—just pure, hearty nourishment in every sip.",
+    ingredients: [
+      "Fresh Ripe Bananas (ताज़ा पके केले)",
+      "Pure Chilled Milk (ठंडा शुद्ध दूध)",
+      "A Touch of Natural Honey",
+      "Crushed Green Cardamom (इलायची)",
+      "Garnished with Almonds & Cashews",
+    ],
+    benefits: [
+      "Instant Energy Booster",
+      "Rich in Potassium & Calcium",
+      "Supports Healthy Digestion",
+      "Muscle Recovery & Strength",
+    ],
+    tasteProfile:
+      "Naturally sweet, thick, velvety smooth with a warm aromatic cardamom finish",
+    bestTime:
+      "Morning breakfast, post-workout recovery, or an active evening energy boost",
+    nutrition: {
+      calories: "195 kcal",
+      vitaminC: "20% RDA",
+      sugar: "Natural Fruit & Milk",
+    },
+    price: 50,
+    image:
+      "https://images.unsplash.com/photo-1707219811295-0f283760668b?auto=format&fit=crop&w=900&q=85",
+    color: "#eed15a",
+    hoverNote:
+      "Creamy fresh banana shake blended with cold milk and green cardamom. Rich in natural potassium.",
+    tag: "Power Shake",
+    volume: "300 ml",
+  },
+  {
+    id: "papaya-shake",
+    name: "Fresh Papaya Shake (ताज़ा पपीता शेक)",
+    subtitle: "Smooth Tropical Digestion Shake",
+    category: "wellness",
+    categoryLabel: "Shakes & Smoothies",
+    description:
+      "Deliciously smooth papaya shake made from sweet, fresh ripe papayas and cold milk. Packed with natural digestive enzymes and vitamins that soothe the stomach and support radiant, glowing skin.",
+    fullStory:
+      "Fresh ripe golden papayas are peeled and blended cold with pure chilled milk, lightly sweetened and scented with fragrant cardamom. The natural papain enzyme in papaya makes it exceptionally light and soothing for gut health.",
+    ingredients: [
+      "Fresh Ripe Papaya (ताज़ा मीठा पपीता)",
+      "Pure Chilled Milk (ठंडा दूध)",
+      "Natural Honey / Light Sweetener",
+      "Green Cardamom Powder (इलायची)",
+      "Finely Chopped Cashew & Almond Garnish",
+    ],
+    benefits: [
+      "Gut Health & Papain Enzyme",
+      "Radiant Skin Complexion",
+      "Rich in Vitamin A & C",
+      "Natural Digestive Comfort",
+    ],
+    tasteProfile:
+      "Mellow, silky smooth, gently sweet with an authentic tropical papaya aroma",
+    bestTime:
+      "Breakfast, mid-morning digestive soothing, or a light healthy refreshment",
+    nutrition: {
+      calories: "145 kcal",
+      vitaminC: "85% RDA",
+      sugar: "Natural Fruit & Milk",
+    },
+    price: 50,
+    image:
+      "https://images.unsplash.com/photo-1517282009859-f000ec3b26fe?auto=format&fit=crop&w=900&q=85",
+    color: "#f38c38",
+    hoverNote:
+      "Sweet ripe papaya blended with cold milk. Soothes digestion with natural papain enzymes.",
+    tag: "Gut Healer",
+    volume: "300 ml",
+  },
+  {
+    id: "mosambi-pineapple-mix",
+    name: "Mosambi Pineapple Mix (ताज़ा मौसंबी-अनानास जूस)",
+    subtitle: "The Classic Ganga Jamuna Cooler",
+    category: "citrus",
+    categoryLabel: "Citrus & Immunity",
+    description:
+      "The beloved Indian classic juice blend combining fresh sweet lime (mosambi) and tropical pineapple. Perfectly balanced with sweet and tangy citrus notes, enhanced with roasted cumin and rock salt.",
+    fullStory:
+      "Fresh sweet limes are cold-pressed together with juicy tropical pineapples to create the ultimate thirst quencher. The bromelain enzymes in pineapple paired with high Vitamin C in sweet lime create a light, digestive tonic that cools you down instantly.",
+    ingredients: [
+      "Fresh Sweet Lime (ताज़ा मौसंबी)",
+      "Sweet Ripe Pineapple (रसीला अनानास)",
+      "Himalayan Black Salt (काला नमक)",
+      "Roasted Jeera (भुना जीरा पाउडर)",
+      "A Touch of Fresh Mint",
+    ],
+    benefits: [
+      "Immunity Shield (High Vitamin C)",
+      "Bromelain for Easy Digestion",
+      "Instant Thirst Quencher",
+      "Natural Anti-Bloat Cooler",
+    ],
+    tasteProfile:
+      "Sweet, tangy, aromatic tropical citrus burst with a savory pinch of rock salt",
+    bestTime:
+      "Mid-morning, warm afternoons, or post-meal digestive refreshment",
+    nutrition: {
+      calories: "105 kcal",
+      vitaminC: "135% RDA",
+      sugar: "0g Added Sugar",
+    },
+    price: 60,
+    image:
+      "https://images.unsplash.com/photo-1550258987-190a2d41a8ba?auto=format&fit=crop&w=900&q=85",
+    color: "#d7b32a",
+    hoverNote:
+      "Fresh mosambi and pineapple pressed together with black salt. Pure sweet-tangy refreshment.",
+    tag: "Classic Duo",
+    volume: "300 ml",
+  },
+  {
+    id: "mosambi-pineapple-anar-mix",
+    name: "Mosambi Pineapple Anar (मौसंबी-अनानास-अनार जूस)",
+    subtitle: "Royal Triveni Antioxidant Fusion",
+    category: "citrus",
+    categoryLabel: "Citrus & Immunity",
+    description:
+      "A rich, vibrant blend of whole-aril Kashmiri pomegranates, fresh sweet lime, and golden pineapple. Packed with powerful antioxidants and polyphenols that boost hemoglobin, protect the heart, and elevate daily stamina.",
+    fullStory:
+      "Known as Triveni juice in traditional juice corners, this powerhouse trio unites deep ruby pomegranates, refreshing mosambi, and digestive pineapple. Pure whole fruits cold-pressed without a single drop of added water or artificial sugar.",
+    ingredients: [
+      "Ruby Pomegranate Arils (कश्मीरी अनार के दाने)",
+      "Fresh Mosambi (ताज़ा मौसंबी)",
+      "Queen Pineapple (मीठा अनानास)",
+      "Black Salt & Roasted Cumin (हल्का काला नमक)",
+      "Squeeze of Fresh Lemon",
+    ],
+    benefits: [
+      "Rich in Punicalagins & Antioxidants",
+      "Boosts Hemoglobin & Circulation",
+      "Heart Health & Cellular Energy",
+      "Natural Digestive & Immune Defense",
+    ],
+    tasteProfile:
+      "Deeply flavorful ruby tart-sweetness, lush pomegranate depth with bright citrus sparkle",
+    bestTime:
+      "Afternoon vitality tonic or pre-workout stamina builder",
+    nutrition: {
+      calories: "128 kcal",
+      vitaminC: "140% RDA",
+      sugar: "0g Added Sugar",
+    },
+    price: 100,
+    image:
+      "https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?auto=format&fit=crop&w=900&q=85",
+    color: "#b83446",
+    hoverNote:
+      "Royal mix of pomegranate, mosambi, and pineapple. 100% pure whole fruits, zero added water.",
+    tag: "Antioxidant Powerhouse",
+    volume: "300 ml",
+  },
+  {
+    id: "banana-papaya-mix",
+    name: "Banana Papaya Mix Shake (केला-पपीता मिक्स शेक)",
+    subtitle: "Nourishing Dual Fruit Wellness Shake",
+    category: "wellness",
+    categoryLabel: "Shakes & Smoothies",
+    description:
+      "A rich and wholesome dual-fruit shake combining ripe sweet bananas and golden papayas with fresh cold milk. Highly satisfying, easy on the stomach, and loaded with essential vitamins, minerals, and digestive enzymes.",
+    fullStory:
+      "The natural energy of bananas joins the gentle digestive power of papayas in one creamy, thick shake. Blended with chilled pure milk, honey, and green cardamom, this shake offers steady energy and complete digestive ease.",
+    ingredients: [
+      "Ripe Bananas (ताज़ा पके केले)",
+      "Golden Papaya (पका पपीता)",
+      "Pure Chilled Milk (ठंडा शुद्ध दूध)",
+      "Natural Honey / Light Sweetener",
+      "Green Cardamom & Crushed Dry Fruits",
+    ],
+    benefits: [
+      "Digestive Ease & Gut Health",
+      "Dual Potassium & Papain Fuel",
+      "Long-Lasting Healthy Fullness",
+      "Supports Active Metabolism",
+    ],
+    tasteProfile:
+      "Extra creamy, thick, naturally tropical sweet with balanced fruit goodness",
+    bestTime:
+      "Breakfast, quick healthy meal replacement, or wholesome workout recovery",
+    nutrition: {
+      calories: "175 kcal",
+      vitaminC: "60% RDA",
+      sugar: "Natural Fruit & Milk",
+    },
+    price: 60,
+    image:
+      "https://images.unsplash.com/photo-1553530666-ba11a7da3888?auto=format&fit=crop&w=900&q=85",
+    color: "#e8a838",
+    hoverNote:
+      "Bananas and sweet papaya blended with chilled milk. Nutritious, filling, and gentle on the gut.",
+    tag: "Dual Energy",
     volume: "300 ml",
   },
   // {
@@ -664,32 +869,27 @@ export const products: Product[] = [
 ];
 
 const categories: Array<{ id: JuiceCategory; label: string; count: number }> = [
-  { id: "all", label: "All Juices", count: products.length },
-  // {
-  //   id: "green",
-  //   label: "Green & Detox",
-  //   count: products.filter((p) => p.category === "green").length,
-  // },
-  // {
-  //   id: "citrus",
-  //   label: "Citrus & Immunity",
-  //   count: products.filter((p) => p.category === "citrus").length,
-  // },
-  // {
-  //   id: "roots",
-  //   label: "Roots & Energy",
-  //   count: products.filter((p) => p.category === "roots").length,
-  // },
-  // {
-  //   id: "hydration",
-  //   label: "Hydration & Coolers",
-  //   count: products.filter((p) => p.category === "hydration").length,
-  // },
-  // {
-  //   id: "wellness",
-  //   label: "Botanical & Shots",
-  //   count: products.filter((p) => p.category === "wellness").length,
-  // },
+  { id: "all", label: "All Items", count: products.length },
+  {
+    id: "wellness",
+    label: "Fresh Shakes",
+    count: products.filter((p) => p.category === "wellness").length,
+  },
+  {
+    id: "citrus",
+    label: "Citrus & Mix Juices",
+    count: products.filter((p) => p.category === "citrus").length,
+  },
+  {
+    id: "roots",
+    label: "Roots & Energy",
+    count: products.filter((p) => p.category === "roots").length,
+  },
+  {
+    id: "hydration",
+    label: "Hydration",
+    count: products.filter((p) => p.category === "hydration").length,
+  },
 ];
 
 const formatPrice = (amount: number) =>

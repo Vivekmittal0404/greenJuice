@@ -15,6 +15,20 @@ const catalog: Record<string, { name: string; price: number }> = {
   "ginger-immunity-shot": { name: "Fiery Ginger & Turmeric Tonic", price: 70 },
   "jamun-metabolic": { name: "Wild Jamun & Amla Balance", price: 110 },
   "sugarcane-pure": { name: "Pure Sugarcane (ताज़ा गन्ने का जूस)", price: 60 },
+  "banana-shake": { name: "Fresh Banana Shake (ताज़ा केला शेक)", price: 50 },
+  "papaya-shake": { name: "Fresh Papaya Shake (ताज़ा पपीता शेक)", price: 50 },
+  "mosambi-pineapple-mix": {
+    name: "Mosambi Pineapple Mix (ताज़ा मौसंबी-अनानास जूस)",
+    price: 60,
+  },
+  "mosambi-pineapple-anar-mix": {
+    name: "Mosambi Pineapple Anar (मौसंबी-अनानास-अनार जूस)",
+    price: 100,
+  },
+  "banana-papaya-mix": {
+    name: "Banana Papaya Mix Shake (केला-पपीता मिक्स शेक)",
+    price: 60,
+  },
 };
 
 type OrderLine = {
