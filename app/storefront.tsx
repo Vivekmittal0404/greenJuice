@@ -422,7 +422,7 @@ export const products: Product[] = [
       vitaminC: "45% RDA",
       sugar: "0g Added Sugar",
     },
-    price: 60,
+    price: 40,
     image: "/images/sugarcane.webp",
     color: "#a4b954",
     hoverNote:
@@ -1637,7 +1637,7 @@ export default function Storefront() {
             DELIVERING BHIWANI ONLY · WE WILL EXPAND OUR SERVICES SOON IN ALL
             INDIA
           </strong>
-          <span className="ribbon-note">Free delivery on orders over ₹499</span>
+          <span className="ribbon-note">Free delivery on orders over ₹199</span>
         </span>
       </div>
 
