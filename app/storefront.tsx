@@ -1,26 +1,42 @@
 "use client";
 
-import { useState, useSyncExternalStore, type FormEvent } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  type FormEvent,
+} from "react";
+import {
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  type ConfirmationResult,
+} from "firebase/auth";
+import { getFirebaseAuth, isFirebaseConfigured } from "./lib/firebase";
 import {
   AlertTriangle,
   ArrowDown,
   Ban,
   Check,
+  CheckCircle2,
   ChevronRight,
   ClipboardList,
   Droplets,
   Info,
   Leaf,
+  LogOut,
   MapPin,
   Minus,
   Pencil,
   Plus,
   Search,
+  ShieldCheck,
   ShoppingBag,
   Snowflake,
   Sparkles,
   Trash2,
   Truck,
+  User,
   X,
 } from "lucide-react";
 import Script from "next/script";
@@ -380,7 +396,7 @@ export const products: Product[] = [
       sugar: "0g Added Sugar",
     },
     price: 130,
-    image: "/images/pomegranate.jpg",
+    image: "/images/pomegranate.webp",
     color: "#7d1629",
     hoverNote:
       "Over 1.2 kg of ruby pomegranates per bottle. Rich in punicalagins.",
@@ -419,7 +435,7 @@ export const products: Product[] = [
       sugar: "0g Added Sugar",
     },
     price: 60,
-    image: "/images/sugarcane.jpg",
+    image: "/images/sugarcane.webp",
     color: "#a4b954",
     hoverNote:
       "100% natural fresh sugarcane juice with ginger, mint, and lemon. No water added.",
@@ -835,6 +851,300 @@ export default function Storefront() {
     useState(false);
   const [restrictedCityEntered, setRestrictedCityEntered] = useState("");
 
+  // Mobile Number & OTP Authentication State
+  const [currentUser, setCurrentUser] = useState<{ phone: string } | null>(
+    null,
+  );
+  const [authToken, setAuthToken] = useState("");
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authPhone, setAuthPhone] = useState("");
+  const [authOtp, setAuthOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [authSuccessMsg, setAuthSuccessMsg] = useState("");
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  const [demoOtpNotice, setDemoOtpNotice] = useState<string | null>(null);
+
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null);
+
+  // Check user session on initial mount
+  useEffect(() => {
+    let isMounted = true;
+    async function checkAuthSession() {
+      try {
+        const cachedToken = localStorage.getItem("juicewala_token") || "";
+        const cachedPhone = localStorage.getItem("juicewala_phone") || "";
+
+        const res = await fetch("/api/auth/me", {
+          headers: cachedToken ? { Authorization: `Bearer ${cachedToken}` } : {},
+        });
+        const data = (await res.json()) as {
+          loggedIn?: boolean;
+          phone?: string;
+        };
+
+        if (!isMounted) return;
+
+        if (data.loggedIn && data.phone) {
+          setCurrentUser({ phone: data.phone });
+          setAuthToken(cachedToken);
+        } else if (cachedToken && cachedPhone) {
+          setCurrentUser({ phone: cachedPhone });
+          setAuthToken(cachedToken);
+        } else {
+          setCurrentUser(null);
+        }
+      } catch {
+        if (isMounted) {
+          try {
+            const cachedPhone = localStorage.getItem("juicewala_phone") || "";
+            const cachedToken = localStorage.getItem("juicewala_token") || "";
+            if (cachedPhone && cachedToken) {
+              setCurrentUser({ phone: cachedPhone });
+              setAuthToken(cachedToken);
+            }
+          } catch {}
+        }
+      }
+    }
+
+    void checkAuthSession();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Cooldown countdown timer for Resend OTP
+  useEffect(() => {
+    if (otpCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setOtpCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [otpCooldown]);
+
+  async function handleSendOtp(targetPhone?: string) {
+    const phoneToSend = (targetPhone || authPhone).trim();
+    if (!/^[6-9][0-9]{9}$/.test(phoneToSend)) {
+      setAuthError("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+    setAuthError("");
+    setAuthSuccessMsg("");
+    setDemoOtpNotice(null);
+    setIsSendingOtp(true);
+
+    // 1. Google Firebase Phone Authentication
+    if (isFirebaseConfigured()) {
+      try {
+        const auth = getFirebaseAuth();
+        if (!auth) throw new Error("Firebase auth is not initialized.");
+
+        if (!recaptchaVerifierRef.current) {
+          recaptchaVerifierRef.current = new RecaptchaVerifier(
+            auth,
+            "recaptcha-container",
+            {
+              size: "invisible",
+            },
+          );
+        }
+
+        const confirmation = await signInWithPhoneNumber(
+          auth,
+          `+91${phoneToSend}`,
+          recaptchaVerifierRef.current,
+        );
+        confirmationResultRef.current = confirmation;
+        setOtpSent(true);
+        setOtpCooldown(30);
+        setAuthSuccessMsg(`Firebase OTP sent to +91 ${phoneToSend}`);
+        setIsSendingOtp(false);
+        return;
+      } catch (err: unknown) {
+        console.error("[Firebase Phone Auth Error]", err);
+        try {
+          recaptchaVerifierRef.current?.clear();
+          recaptchaVerifierRef.current = null;
+        } catch {}
+
+        const errCode =
+          typeof err === "object" && err !== null && "code" in err
+            ? (err as { code: string }).code
+            : "";
+
+        if (errCode === "auth/invalid-phone-number") {
+          setAuthError("Invalid phone number format.");
+          setIsSendingOtp(false);
+          return;
+        }
+        if (errCode === "auth/too-many-requests") {
+          setAuthError("Too many OTP requests. Please wait a few minutes.");
+          setIsSendingOtp(false);
+          return;
+        }
+
+        const errMsg =
+          err instanceof Error
+            ? err.message
+            : "Could not send Firebase OTP.";
+        setAuthError(errMsg);
+        setIsSendingOtp(false);
+        return;
+      }
+    }
+
+    // 2. Fallback mode (when Firebase env variables are not yet entered)
+    try {
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phoneToSend }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setAuthError(data.error || "Could not send OTP. Please try again.");
+        if (data.cooldownSeconds) {
+          setOtpCooldown(data.cooldownSeconds);
+        }
+      } else {
+        setOtpSent(true);
+        setOtpCooldown(30);
+        setAuthSuccessMsg(data.message || `OTP sent to +91 ${phoneToSend}`);
+        if (data.demoOtp) {
+          setDemoOtpNotice(data.demoOtp);
+        }
+      }
+    } catch {
+      setAuthError("Network error. Please check your connection.");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  }
+
+  async function handleVerifyOtp(targetPhone?: string, targetOtp?: string) {
+    const phoneToVerify = (targetPhone || authPhone).trim();
+    const otpToVerify = (targetOtp || authOtp).trim();
+
+    if (!/^[6-9][0-9]{9}$/.test(phoneToVerify)) {
+      setAuthError("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+    if (!/^[0-9]{6}$/.test(otpToVerify)) {
+      setAuthError("Please enter the 6-digit OTP received.");
+      return;
+    }
+
+    setAuthError("");
+    setAuthSuccessMsg("");
+    setIsVerifyingOtp(true);
+
+    // If active Firebase confirmation result
+    if (confirmationResultRef.current) {
+      try {
+        const userCredential = await confirmationResultRef.current.confirm(
+          otpToVerify,
+        );
+        const idToken = await userCredential.user.getIdToken();
+
+        const res = await fetch("/api/auth/firebase-verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken }),
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          setAuthError(data.error || "Failed to verify Firebase session.");
+          setIsVerifyingOtp(false);
+          return;
+        }
+
+        const user = { phone: data.phone || phoneToVerify };
+        setCurrentUser(user);
+        setAuthToken(data.token || "");
+        try {
+          localStorage.setItem("juicewala_token", data.token || "");
+          localStorage.setItem("juicewala_phone", user.phone);
+        } catch {}
+        setIsAuthModalOpen(false);
+        setOtpSent(false);
+        setAuthOtp("");
+        setDemoOtpNotice(null);
+        confirmationResultRef.current = null;
+        setIsVerifyingOtp(false);
+        return;
+      } catch (err: unknown) {
+        console.error("[Firebase Verify Error]", err);
+        const errCode =
+          typeof err === "object" && err !== null && "code" in err
+            ? (err as { code: string }).code
+            : "";
+        const errMsg =
+          errCode === "auth/invalid-verification-code"
+            ? "Incorrect OTP. Please check the code received on your phone."
+            : errCode === "auth/code-expired"
+              ? "OTP has expired. Please request a new code."
+              : "Verification failed. Please try again.";
+        setAuthError(errMsg);
+        setIsVerifyingOtp(false);
+        return;
+      }
+    }
+
+    // Fallback API verification
+    try {
+      const res = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phoneToVerify, otp: otpToVerify }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setAuthError(data.error || "Incorrect OTP. Please try again.");
+      } else {
+        const user = { phone: data.phone || phoneToVerify };
+        setCurrentUser(user);
+        setAuthToken(data.token || "");
+        try {
+          localStorage.setItem("juicewala_token", data.token || "");
+          localStorage.setItem("juicewala_phone", user.phone);
+        } catch {}
+        setIsAuthModalOpen(false);
+        setOtpSent(false);
+        setAuthOtp("");
+        setDemoOtpNotice(null);
+      }
+    } catch {
+      setAuthError("Network error. Please try again.");
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      const auth = getFirebaseAuth();
+      if (auth) {
+        await auth.signOut();
+      }
+    } catch {}
+    setCurrentUser(null);
+    setAuthToken("");
+    try {
+      localStorage.removeItem("juicewala_token");
+      localStorage.removeItem("juicewala_phone");
+    } catch {}
+    setOtpSent(false);
+    setAuthOtp("");
+    setDemoOtpNotice(null);
+    confirmationResultRef.current = null;
+  }
+
   function isBhiwaniLocation(city: string, pin: string): boolean {
     const cleanCity = city.trim().toLowerCase();
     const cleanPin = pin.trim();
@@ -945,6 +1255,67 @@ export default function Storefront() {
     }
     setOrder(null);
     setError("");
+
+    setCartToast((curr) => {
+      if (!curr || curr.product.id !== productId) return curr;
+      if (quantity <= 0) return null;
+      return { ...curr, quantity };
+    });
+  }
+
+  const [animatingButtonId, setAnimatingButtonId] = useState<string | null>(
+    null,
+  );
+  const [animatingQtyId, setAnimatingQtyId] = useState<string | null>(null);
+  const [animatingHeaderQty, setAnimatingHeaderQty] = useState(false);
+  const [cartToast, setCartToast] = useState<{
+    product: Product;
+    quantity: number;
+  } | null>(null);
+
+  function handleAddToCartWithAnimation(product: Product) {
+    setAnimatingButtonId(product.id);
+    setAnimatingQtyId(product.id);
+    setAnimatingHeaderQty(true);
+    setTimeout(() => {
+      setAnimatingButtonId((curr) => (curr === product.id ? null : curr));
+      setAnimatingQtyId((curr) => (curr === product.id ? null : curr));
+      setAnimatingHeaderQty(false);
+    }, 850);
+
+    const nextQty = (cart[product.id] ?? 0) + 1;
+    changeQuantity(product.id, 1);
+    setCartToast({ product, quantity: nextQty });
+  }
+
+  function handleUpdateBagQuantity(item: Product, delta: number) {
+    const nextQty = (cart[item.id] ?? 0) + delta;
+    if (delta > 0) {
+      const buttonKey = `bag-${item.id}`;
+      setAnimatingButtonId(buttonKey);
+      setAnimatingQtyId(item.id);
+      setAnimatingHeaderQty(true);
+      setTimeout(() => {
+        setAnimatingButtonId((curr) => (curr === buttonKey ? null : curr));
+        setAnimatingQtyId((curr) => (curr === item.id ? null : curr));
+        setAnimatingHeaderQty(false);
+      }, 850);
+    } else {
+      setAnimatingQtyId(item.id);
+      setAnimatingHeaderQty(true);
+      setTimeout(() => {
+        setAnimatingQtyId((curr) => (curr === item.id ? null : curr));
+        setAnimatingHeaderQty(false);
+      }, 450);
+    }
+
+    changeQuantity(item.id, delta);
+
+    if (nextQty > 0) {
+      setCartToast({ product: item, quantity: nextQty });
+    } else {
+      setCartToast((curr) => (curr?.product.id === item.id ? null : curr));
+    }
   }
 
   function openCart() {
@@ -976,6 +1347,18 @@ export default function Storefront() {
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+
+    if (!currentUser) {
+      setAuthError(
+        "Please login with your mobile number and verify OTP to confirm your order.",
+      );
+      setError(
+        "Please login with your mobile number and verify OTP to confirm your order.",
+      );
+      setIsAuthModalOpen(true);
+      return;
+    }
+
     setIsSubmitting(true);
     const formData = new FormData(event.currentTarget);
     const orderedItems = cartItems.map(({ id, quantity }) => ({
@@ -984,7 +1367,7 @@ export default function Storefront() {
     }));
 
     const name = (formData.get("name") as string) || "";
-    const phone = (formData.get("phone") as string) || "";
+    const phone = currentUser.phone;
     const city = (formData.get("city") as string) || "";
     const pincode = (formData.get("pincode") as string) || "";
     const streetAddress = (formData.get("address") as string) || "";
@@ -1005,10 +1388,17 @@ export default function Storefront() {
 
     const fullAddress = `${streetAddress.trim()}, ${city.trim()} - ${pincode.trim()}`;
 
+    const orderHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (authToken) {
+      orderHeaders["Authorization"] = `Bearer ${authToken}`;
+    }
+
     try {
       const response = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: orderHeaders,
         body: JSON.stringify({
           customer: {
             name: name.trim(),
@@ -1023,6 +1413,16 @@ export default function Storefront() {
       const result = (await response.json()) as
         | CreatedOrder
         | { error: string };
+
+      if (response.status === 401) {
+        setCurrentUser(null);
+        setIsAuthModalOpen(true);
+        throw new Error(
+          "error" in result
+            ? result.error
+            : "Please verify your mobile number with OTP before placing an order.",
+        );
+      }
 
       if (!response.ok || !("orderId" in result)) {
         throw new Error(
@@ -1403,6 +1803,39 @@ export default function Storefront() {
         </nav>
 
         <div className="header-actions">
+          {currentUser ? (
+            <div className="auth-header-pill">
+              <span
+                className="auth-user-tag"
+                title={`Logged in: +91 ${currentUser.phone}`}
+              >
+                <User size={15} aria-hidden="true" />
+                <span>+91 {currentUser.phone}</span>
+              </span>
+              <button
+                className="auth-logout-icon-btn"
+                onClick={handleLogout}
+                title="Logout / Switch Account"
+                aria-label="Logout"
+              >
+                <LogOut size={14} aria-hidden="true" />
+              </button>
+            </div>
+          ) : (
+            <button
+              className="auth-nav-btn"
+              onClick={() => {
+                setAuthError("");
+                setAuthSuccessMsg("");
+                setIsAuthModalOpen(true);
+              }}
+              aria-label="Login with mobile number"
+            >
+              <User size={17} aria-hidden="true" />
+              <span>Login</span>
+            </button>
+          )}
+
           <button className="orders-button" onClick={openOrders}>
             <ClipboardList size={18} aria-hidden="true" />
             <span>My orders</span>
@@ -1965,21 +2398,68 @@ export default function Storefront() {
                         >
                           <Minus size={15} />
                         </button>
-                        <span>{cart[product.id]}</span>
+                        <span
+                          className={
+                            animatingQtyId === product.id
+                              ? "qty-increase-animation"
+                              : ""
+                          }
+                        >
+                          {cart[product.id]}
+                        </span>
                         <button
-                          onClick={() => changeQuantity(product.id, 1)}
+                          onClick={() => handleAddToCartWithAnimation(product)}
                           aria-label={`Add one ${product.name}`}
+                          className={
+                            animatingButtonId === product.id
+                              ? "button-star-bounce"
+                              : ""
+                          }
                         >
                           <Plus size={15} />
+                          {animatingButtonId === product.id && (
+                            <span
+                              className="star-burst-container"
+                              aria-hidden="true"
+                            >
+                              <span className="star-particle star-p1">★</span>
+                              <span className="star-particle star-p2">✦</span>
+                              <span className="star-particle star-p3">★</span>
+                              <span className="star-particle star-p4">✦</span>
+                              <span className="star-particle star-p5">★</span>
+                              <span className="star-particle star-p6">✨</span>
+                              <span className="star-particle star-p7">★</span>
+                              <span className="star-particle star-p8">✦</span>
+                            </span>
+                          )}
                         </button>
                       </div>
                     ) : (
                       <button
-                        className="add-button"
-                        onClick={() => changeQuantity(product.id, 1)}
+                        className={`add-button ${
+                          animatingButtonId === product.id
+                            ? "button-star-bounce"
+                            : ""
+                        }`}
+                        onClick={() => handleAddToCartWithAnimation(product)}
                         aria-label={`Add ${product.name} to bag`}
                       >
                         <Plus size={16} aria-hidden="true" /> Add
+                        {animatingButtonId === product.id && (
+                          <span
+                            className="star-burst-container"
+                            aria-hidden="true"
+                          >
+                            <span className="star-particle star-p1">★</span>
+                            <span className="star-particle star-p2">✦</span>
+                            <span className="star-particle star-p3">★</span>
+                            <span className="star-particle star-p4">✦</span>
+                            <span className="star-particle star-p5">★</span>
+                            <span className="star-particle star-p6">✨</span>
+                            <span className="star-particle star-p7">★</span>
+                            <span className="star-particle star-p8">✦</span>
+                          </span>
+                        )}
                       </button>
                     )}
                   </div>
@@ -2302,7 +2782,7 @@ export default function Storefront() {
                       display: "block",
                     }}
                   >
-                    Price per bottle
+                    Price
                   </span>
                   <strong style={{ fontSize: 18, color: "var(--forest)" }}>
                     {formatPrice(activeDetailProduct.price)}
@@ -2317,23 +2797,69 @@ export default function Storefront() {
                     >
                       <Minus size={15} />
                     </button>
-                    <span>{cart[activeDetailProduct.id]}</span>
+                    <span
+                      className={
+                        animatingQtyId === activeDetailProduct.id
+                          ? "qty-increase-animation"
+                          : ""
+                      }
+                    >
+                      {cart[activeDetailProduct.id]}
+                    </span>
                     <button
-                      onClick={() => changeQuantity(activeDetailProduct.id, 1)}
+                      onClick={() =>
+                        handleAddToCartWithAnimation(activeDetailProduct)
+                      }
                       aria-label="Add one"
+                      className={
+                        animatingButtonId === activeDetailProduct.id
+                          ? "button-star-bounce"
+                          : ""
+                      }
                     >
                       <Plus size={15} />
+                      {animatingButtonId === activeDetailProduct.id && (
+                        <span
+                          className="star-burst-container"
+                          aria-hidden="true"
+                        >
+                          <span className="star-particle star-p1">★</span>
+                          <span className="star-particle star-p2">✦</span>
+                          <span className="star-particle star-p3">★</span>
+                          <span className="star-particle star-p4">✦</span>
+                          <span className="star-particle star-p5">★</span>
+                          <span className="star-particle star-p6">✨</span>
+                          <span className="star-particle star-p7">★</span>
+                          <span className="star-particle star-p8">✦</span>
+                        </span>
+                      )}
                     </button>
                   </div>
                 ) : (
                   <button
-                    className="add-button"
+                    className={`add-button ${
+                      animatingButtonId === activeDetailProduct.id
+                        ? "button-star-bounce"
+                        : ""
+                    }`}
                     style={{ minWidth: 120, height: 40, fontSize: 13 }}
                     onClick={() => {
-                      changeQuantity(activeDetailProduct.id, 1);
+                      handleAddToCartWithAnimation(activeDetailProduct);
                     }}
                   >
                     <Plus size={16} /> Add to Bag
+                    {animatingButtonId === activeDetailProduct.id && (
+                      <span className="star-burst-container" aria-hidden="true">
+                        <span className="star-particle star-p1">★</span>
+                        <span className="star-particle star-p2">✦</span>
+                        <span className="star-particle star-p3">★</span>
+                        <span className="star-particle star-p4">✦</span>
+                        <span className="star-particle star-p5">★</span>
+                        <span className="star-particle star-p6">✨</span>
+                        <span className="star-particle star-p7">★</span>
+                        <span className="star-particle star-p8">✦</span>
+                      </span>
+                    )}
                   </button>
                 )}
               </div>
@@ -2419,7 +2945,14 @@ export default function Storefront() {
               <div>
                 <p className="eyebrow">COLD-CHAIN DOORSTEP DELIVERY</p>
                 <h2 id="cart-title">
-                  Your bag <span>({itemCount} bottles)</span>
+                  Your bag{" "}
+                  <span
+                    className={
+                      animatingHeaderQty ? "drawer-header-qty-bounce" : ""
+                    }
+                  >
+                    ({itemCount})
+                  </span>
                 </h2>
               </div>
               <button
@@ -2524,11 +3057,11 @@ export default function Storefront() {
                     <h3>Order confirmed!</h3>
                     <p className="payment-lead">
                       Your order total is {formatPrice(order.amount)}. Pay cash
-                      upon cold-box doorstep delivery.
+                      upon doorstep delivery.
                     </p>
                     <p className="payment-disclaimer">
-                      Payment is due on delivery. Bottles are delivered in
-                      temperature-controlled insulated packaging.
+                      Payment is due on delivery. Juices are delivered in
+                      safe packaging.
                     </p>
                   </>
                 )}
@@ -2572,20 +3105,48 @@ export default function Storefront() {
                       />
                       <div className="cart-item-info">
                         <strong>{item.name}</strong>
-                        <span>{formatPrice(item.price)} / bottle</span>
+                        <span>{formatPrice(item.price)}</span>
                         <div className="quantity-control compact">
                           <button
-                            onClick={() => changeQuantity(item.id, -1)}
+                            onClick={() => handleUpdateBagQuantity(item, -1)}
                             aria-label={`Remove one ${item.name}`}
                           >
                             <Minus size={13} />
                           </button>
-                          <span>{item.quantity}</span>
+                          <span
+                            className={
+                              animatingQtyId === item.id
+                                ? "qty-increase-animation"
+                                : ""
+                            }
+                          >
+                            {item.quantity}
+                          </span>
                           <button
-                            onClick={() => changeQuantity(item.id, 1)}
+                            onClick={() => handleUpdateBagQuantity(item, 1)}
                             aria-label={`Add one ${item.name}`}
+                            className={
+                              animatingButtonId === `bag-${item.id}`
+                                ? "button-star-bounce"
+                                : ""
+                            }
                           >
                             <Plus size={13} />
+                            {animatingButtonId === `bag-${item.id}` && (
+                              <span
+                                className="star-burst-container"
+                                aria-hidden="true"
+                              >
+                                <span className="star-particle star-p1">★</span>
+                                <span className="star-particle star-p2">✦</span>
+                                <span className="star-particle star-p3">★</span>
+                                <span className="star-particle star-p4">✦</span>
+                                <span className="star-particle star-p5">★</span>
+                                <span className="star-particle star-p6">✨</span>
+                                <span className="star-particle star-p7">★</span>
+                                <span className="star-particle star-p8">✦</span>
+                              </span>
+                            )}
                           </button>
                         </div>
                       </div>
@@ -2617,37 +3178,198 @@ export default function Storefront() {
                 </div>
 
                 <p className="cart-delivery-note">
-                  <Snowflake size={15} aria-hidden="true" />{" "}
-                  Guaranteed fresh cold delivery across all areas in Bhiwani only.
+                  <Snowflake size={15} aria-hidden="true" /> Guaranteed fresh
+                  cold delivery across all areas in Bhiwani only.
                 </p>
 
-                <form className="checkout-form" onSubmit={submitOrder}>
-                  <p className="eyebrow">WHERE SHOULD WE DELIVER YOUR JUICE?</p>
+                {!currentUser ? (
+                  <div className="checkout-auth-card">
+                    <div className="checkout-auth-header">
+                      <div className="checkout-auth-icon-wrap">
+                        <ShieldCheck size={22} aria-hidden="true" />
+                      </div>
+                      <div>
+                        <h3>Login to Confirm Order</h3>
+                        <p>
+                          Verify your 10-digit mobile number with OTP before placing your cold juice order.
+                        </p>
+                      </div>
+                    </div>
 
-                  <label>
-                    Full name
-                    <input
-                      autoComplete="name"
-                      name="name"
-                      required
-                      maxLength={80}
-                      placeholder="Receiver's name"
-                    />
-                  </label>
+                    {!otpSent ? (
+                      <div className="checkout-auth-body">
+                        <label className="checkout-auth-label">
+                          10-digit Mobile number
+                          <div className="phone-prefix-group">
+                            <span className="phone-prefix">+91</span>
+                            <input
+                              type="tel"
+                              inputMode="numeric"
+                              maxLength={10}
+                              value={authPhone}
+                              onChange={(e) =>
+                                setAuthPhone(e.target.value.replace(/\D/g, ""))
+                              }
+                              placeholder="Enter 10-digit mobile number"
+                              className="auth-input-phone"
+                            />
+                          </div>
+                        </label>
 
-                  <label>
-                    10-digit Mobile number
-                    <input
-                      autoComplete="tel"
-                      inputMode="numeric"
-                      name="phone"
-                      type="tel"
-                      required
-                      pattern="[0-9]{10}"
-                      maxLength={10}
-                      placeholder="10-digit mobile number"
-                    />
-                  </label>
+                        {authError && (
+                          <p className="auth-error-msg">{authError}</p>
+                        )}
+                        {authSuccessMsg && (
+                          <p className="auth-success-msg">{authSuccessMsg}</p>
+                        )}
+
+                        <button
+                          type="button"
+                          className="auth-primary-btn"
+                          disabled={isSendingOtp || authPhone.length !== 10}
+                          onClick={() => handleSendOtp()}
+                        >
+                          {isSendingOtp
+                            ? "Sending OTP..."
+                            : "Send OTP to Mobile"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="checkout-auth-body">
+                        <div className="auth-phone-tag">
+                          <span>
+                            OTP sent to <strong>+91 {authPhone}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOtpSent(false);
+                              setAuthOtp("");
+                              setAuthError("");
+                              setDemoOtpNotice(null);
+                            }}
+                            className="auth-change-link"
+                          >
+                            Change Number
+                          </button>
+                        </div>
+
+                        {demoOtpNotice && (
+                          <div className="demo-otp-banner">
+                            <span>
+                              Demo Mode OTP: <strong>{demoOtpNotice}</strong>
+                            </span>
+                            <button
+                              type="button"
+                              className="demo-autofill-btn"
+                              onClick={() => setAuthOtp(demoOtpNotice)}
+                            >
+                              Auto-fill OTP
+                            </button>
+                          </div>
+                        )}
+
+                        <label className="checkout-auth-label">
+                          Enter 6-digit OTP
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={authOtp}
+                            onChange={(e) =>
+                              setAuthOtp(e.target.value.replace(/\D/g, ""))
+                            }
+                            placeholder="Enter 6-digit code"
+                            className="auth-input-otp"
+                            autoFocus
+                          />
+                        </label>
+
+                        {authError && (
+                          <p className="auth-error-msg">{authError}</p>
+                        )}
+                        {authSuccessMsg && (
+                          <p className="auth-success-msg">{authSuccessMsg}</p>
+                        )}
+
+                        <div className="auth-actions-row">
+                          <button
+                            type="button"
+                            className="auth-primary-btn"
+                            disabled={isVerifyingOtp || authOtp.length !== 6}
+                            onClick={() => handleVerifyOtp()}
+                          >
+                            {isVerifyingOtp
+                              ? "Verifying..."
+                              : "Verify OTP & Continue"}
+                          </button>
+
+                          <button
+                            type="button"
+                            className="auth-resend-btn"
+                            disabled={otpCooldown > 0 || isSendingOtp}
+                            onClick={() => handleSendOtp()}
+                          >
+                            {otpCooldown > 0
+                              ? `Resend in ${otpCooldown}s`
+                              : "Resend OTP"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="checkout-logged-in-bar">
+                      <div className="logged-in-info">
+                        <CheckCircle2
+                          size={16}
+                          className="logged-in-check"
+                          aria-hidden="true"
+                        />
+                        <span>
+                          Verified Mobile:{" "}
+                          <strong>+91 {currentUser.phone}</strong>
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="logged-in-logout-link"
+                        title="Logout / Change number"
+                      >
+                        Change
+                      </button>
+                    </div>
+
+                    <form className="checkout-form" onSubmit={submitOrder}>
+                      <p className="eyebrow">
+                        WHERE SHOULD WE DELIVER YOUR JUICE?
+                      </p>
+
+                      <label>
+                        Full name
+                        <input
+                          autoComplete="name"
+                          name="name"
+                          required
+                          maxLength={80}
+                          placeholder="Receiver's name"
+                        />
+                      </label>
+
+                      <label>
+                        10-digit Mobile number (Verified)
+                        <input
+                          autoComplete="tel"
+                          name="phone"
+                          type="tel"
+                          required
+                          readOnly
+                          value={currentUser.phone}
+                          className="input-verified-locked"
+                        />
+                      </label>
 
                   <div
                     style={{
@@ -2723,7 +3445,9 @@ export default function Storefront() {
                   >
                     <MapPin size={13} aria-hidden="true" />
                     <span>
-                      Service currently available in <strong>Bhiwani only</strong> (PIN codes starting with 127)
+                      Service currently available in{" "}
+                      <strong>Bhiwani only</strong> (PIN codes starting with
+                      127)
                     </span>
                   </div>
 
@@ -2803,6 +3527,8 @@ export default function Storefront() {
                 </form>
               </>
             )}
+          </>
+        )}
           </aside>
         </div>
       )}
@@ -3322,7 +4048,7 @@ export default function Storefront() {
                             <span
                               style={{ fontSize: 10, color: "var(--muted)" }}
                             >
-                              {formatPrice(product?.price || 0)} per bottle
+                              {formatPrice(product?.price || 0)}
                             </span>
                           </div>
 
@@ -3448,6 +4174,219 @@ export default function Storefront() {
           </div>
         </div>
       )}
+      {/* Bottom-Right Cart Notification Popup with Go to Cart Button */}
+      {cartToast && (
+        <aside className="cart-toast-popup" role="status" aria-live="polite">
+          {cartToast.product.image ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={cartToast.product.image}
+              alt={cartToast.product.name}
+              className="cart-toast-thumb"
+            />
+          ) : (
+            <div className="cart-toast-thumb-fallback">
+              <Leaf size={22} />
+            </div>
+          )}
+
+          <div className="cart-toast-content">
+            <p className="cart-toast-status">
+              <Check size={13} strokeWidth={3} /> Added to bag!
+            </p>
+            <p className="cart-toast-title" title={cartToast.product.name}>
+              {cartToast.product.name}
+            </p>
+            <p className="cart-toast-sub">
+              {formatPrice(cartToast.product.price)} ·{" "}
+              <span key={cartToast.quantity} className="cart-toast-qty-pop">
+                {cartToast.quantity} in bag
+              </span>
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="cart-toast-btn"
+            onClick={() => {
+              openCart();
+            }}
+          >
+            Go to Cart <ChevronRight size={14} />
+          </button>
+
+          <button
+            type="button"
+            className="cart-toast-close"
+            onClick={() => setCartToast(null)}
+            aria-label="Dismiss notification"
+          >
+            <X size={16} />
+          </button>
+        </aside>
+      )}
+
+      {/* Standalone Login / Sign Up Modal */}
+      {isAuthModalOpen && (
+        <div
+          className="drawer-backdrop"
+          style={{
+            zIndex: 1200,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+          onMouseDown={(e) =>
+            e.target === e.currentTarget && setIsAuthModalOpen(false)
+          }
+        >
+          <div
+            className="auth-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="auth-modal-title"
+          >
+            <div className="auth-modal-header">
+              <div className="auth-modal-header-left">
+                <div className="auth-modal-icon-badge">
+                  <ShieldCheck size={24} aria-hidden="true" />
+                </div>
+                <div>
+                  <h3 id="auth-modal-title">JuiceWala Login / Sign Up</h3>
+                  <p className="auth-modal-subtitle">
+                    Enter your mobile number to sign in or create an account with OTP
+                  </p>
+                </div>
+              </div>
+              <button
+                className="icon-button modal-close"
+                onClick={() => setIsAuthModalOpen(false)}
+                aria-label="Close login dialog"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {!otpSent ? (
+              <div className="auth-modal-body">
+                <label className="checkout-auth-label">
+                  10-digit Mobile number
+                  <div className="phone-prefix-group">
+                    <span className="phone-prefix">+91</span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={authPhone}
+                      onChange={(e) =>
+                        setAuthPhone(e.target.value.replace(/\D/g, ""))
+                      }
+                      placeholder="Enter mobile number"
+                      className="auth-input-phone"
+                      autoFocus
+                    />
+                  </div>
+                </label>
+
+                {authError && <p className="auth-error-msg">{authError}</p>}
+                {authSuccessMsg && (
+                  <p className="auth-success-msg">{authSuccessMsg}</p>
+                )}
+
+                <button
+                  type="button"
+                  className="auth-primary-btn"
+                  disabled={isSendingOtp || authPhone.length !== 10}
+                  onClick={() => handleSendOtp()}
+                >
+                  {isSendingOtp ? "Sending OTP..." : "Get OTP on Mobile →"}
+                </button>
+              </div>
+            ) : (
+              <div className="auth-modal-body">
+                <div className="auth-phone-tag">
+                  <span>
+                    OTP sent to <strong>+91 {authPhone}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtpSent(false);
+                      setAuthOtp("");
+                      setAuthError("");
+                      setDemoOtpNotice(null);
+                    }}
+                    className="auth-change-link"
+                  >
+                    Change Number
+                  </button>
+                </div>
+
+                {demoOtpNotice && (
+                  <div className="demo-otp-banner">
+                    <span>
+                      Demo Mode OTP: <strong>{demoOtpNotice}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      className="demo-autofill-btn"
+                      onClick={() => setAuthOtp(demoOtpNotice)}
+                    >
+                      Auto-fill OTP
+                    </button>
+                  </div>
+                )}
+
+                <label className="checkout-auth-label">
+                  Enter 6-digit OTP
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={authOtp}
+                    onChange={(e) =>
+                      setAuthOtp(e.target.value.replace(/\D/g, ""))
+                    }
+                    placeholder="Enter 6-digit code"
+                    className="auth-input-otp"
+                    autoFocus
+                  />
+                </label>
+
+                {authError && <p className="auth-error-msg">{authError}</p>}
+                {authSuccessMsg && (
+                  <p className="auth-success-msg">{authSuccessMsg}</p>
+                )}
+
+                <div className="auth-actions-row">
+                  <button
+                    type="button"
+                    className="auth-primary-btn"
+                    disabled={isVerifyingOtp || authOtp.length !== 6}
+                    onClick={() => handleVerifyOtp()}
+                  >
+                    {isVerifyingOtp ? "Verifying..." : "Verify & Sign In"}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="auth-resend-btn"
+                    disabled={otpCooldown > 0 || isSendingOtp}
+                    onClick={() => handleSendOtp()}
+                  >
+                    {otpCooldown > 0
+                      ? `Resend in ${otpCooldown}s`
+                      : "Resend OTP"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {/* Invisible container for Google Firebase Phone Auth reCAPTCHA */}
+      <div id="recaptcha-container" />
     </main>
   );
 }

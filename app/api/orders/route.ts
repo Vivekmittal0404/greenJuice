@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import {
+  COOKIE_NAME,
+  getCookieFromRequest,
+  verifySessionToken,
+} from "../../lib/auth";
 
 const catalog: Record<string, { name: string; price: number }> = {
   "green-juice": { name: "Herbal Green Vitality", price: 60 },
@@ -76,6 +81,30 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Enter a valid name, mobile number and delivery address." },
       { status: 400 },
+    );
+  }
+
+  // Enforce Mobile & OTP Authentication
+  let sessionToken: string | undefined;
+  const authHeader = request.headers.get("authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    sessionToken = authHeader.substring(7).trim();
+  }
+  if (!sessionToken) {
+    sessionToken = getCookieFromRequest(request, COOKIE_NAME);
+  }
+
+  const authenticatedPhone = sessionToken
+    ? verifySessionToken(sessionToken)
+    : null;
+
+  if (!authenticatedPhone || authenticatedPhone !== phone.trim()) {
+    return NextResponse.json(
+      {
+        error:
+          "Please verify your mobile number with OTP before placing an order.",
+      },
+      { status: 401 },
     );
   }
 
