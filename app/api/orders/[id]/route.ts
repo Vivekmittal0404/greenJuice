@@ -241,7 +241,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         (sum, item) => sum + item.unitPrice * item.quantity,
         0,
       );
-      newDeliveryFee = newSubtotal >= 499 ? 0 : 40;
+      newDeliveryFee = newSubtotal >= 199 ? 0 : 20;
       newAmount = newSubtotal + newDeliveryFee;
 
       updateBody.items = updatedOrderLines;

@@ -177,7 +177,7 @@ export async function POST(request: Request) {
     (sum, item) => sum + item.unitPrice * item.quantity,
     0,
   );
-  const deliveryFee = subtotal >= 499 ? 0 : 40;
+  const deliveryFee = subtotal >= 199 ? 0 : 20;
   const amount = subtotal + deliveryFee;
   const razorpayKeyId = process.env.RAZORPAY_KEY_ID?.trim();
   const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET?.trim();

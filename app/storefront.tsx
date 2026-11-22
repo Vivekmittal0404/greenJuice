@@ -7,7 +7,6 @@ import {
 } from "react";
 import {
   AlertTriangle,
-  ArrowDown,
   Ban,
   Check,
   ChevronRight,
@@ -127,8 +126,8 @@ declare global {
 const CART_STORAGE_KEY = "root-ritual-cart-v1";
 const ORDERS_STORAGE_KEY = "root-ritual-orders-v1";
 const STORAGE_UNAVAILABLE = "__root_ritual_storage_unavailable__";
-const FREE_SHIPPING_THRESHOLD = 499;
-const STANDARD_SHIPPING_FEE = 40;
+const FREE_SHIPPING_THRESHOLD = 199;
+const STANDARD_SHIPPING_FEE = 20;
 
 function subscribeToStorage(key: string, callback: () => void) {
   const handleStorage = (event: StorageEvent) => {
@@ -1452,11 +1451,7 @@ export default function Storefront() {
   }
 
   async function handleCancelOrder(orderId: string) {
-    if (
-      !window.confirm(
-        "Are you sure you want to cancel this order? / क्या आप वाकई यह ऑर्डर रद्द करना चाहते हैं?",
-      )
-    ) {
+    if (!window.confirm("Are you sure you want to cancel this order?")) {
       return;
     }
 
@@ -1486,7 +1481,7 @@ export default function Storefront() {
 
     writeStorageValue(ORDERS_STORAGE_KEY, JSON.stringify(updatedOrders));
     setOrderNotice(
-      `Order ${orderId.slice(0, 8).toUpperCase()} has been cancelled / ऑर्डर रद्द कर दिया गया है।`,
+      `Order ${orderId.slice(0, 8).toUpperCase()} has been cancelled.`,
     );
     setOrderActionLoading(null);
   }
@@ -1494,7 +1489,7 @@ export default function Storefront() {
   async function handleDeleteOrder(orderId: string) {
     if (
       !window.confirm(
-        "Are you sure you want to delete this order from history? / क्या आप इस ऑर्डर को हिस्ट्री से हटाना चाहते हैं?",
+        "Are you sure you want to delete this order from history?",
       )
     ) {
       return;
@@ -1516,7 +1511,7 @@ export default function Storefront() {
 
     writeStorageValue(ORDERS_STORAGE_KEY, JSON.stringify(updatedOrders));
     setOrderNotice(
-      `Order ${orderId.slice(0, 8).toUpperCase()} removed from history / ऑर्डर हटा दिया गया है।`,
+      `Order ${orderId.slice(0, 8).toUpperCase()} removed from history.`,
     );
     setOrderActionLoading(null);
   }
@@ -1550,9 +1545,7 @@ export default function Storefront() {
     e.preventDefault();
     if (!editingOrder) return;
     if (editItems.length === 0) {
-      setEditError(
-        "Order must have at least one juice item / कम से कम एक जूस होना चाहिए।",
-      );
+      setEditError("Order must have at least one juice item.");
       return;
     }
 
@@ -1607,7 +1600,7 @@ export default function Storefront() {
 
     writeStorageValue(ORDERS_STORAGE_KEY, JSON.stringify(updatedOrders));
     setOrderNotice(
-      `Order ${editingOrder.orderId.slice(0, 8).toUpperCase()} updated successfully / ऑर्डर अपडेट हो गया है।`,
+      `Order ${editingOrder.orderId.slice(0, 8).toUpperCase()} updated successfully.`,
     );
     setIsSubmittingEdit(false);
     setEditingOrder(null);
@@ -1662,8 +1655,8 @@ export default function Storefront() {
 
         <nav className="desktop-nav" aria-label="Main navigation">
           <a href="#juices">The Juices</a>
-          <a href="#cold-chain">Cold-Chain Delivery</a>
-          <a href="#standards">Our Purity Standard</a>
+          <Link href="/standard-delivery">Standard Delivery</Link>
+          <Link href="/purity-standard">Our Purity Standard</Link>
           <Link href="/contact">Support</Link>
         </nav>
 
@@ -2700,8 +2693,8 @@ export default function Storefront() {
         </div>
       )}
 
-      {/* Cold Chain Delivery Callout Section */}
-      <section className="delivery-callout" id="cold-chain">
+      {/* Standard Delivery Callout Section */}
+      <section className="delivery-callout" id="standard-delivery">
         <div className="delivery-icon">
           <Truck size={25} aria-hidden="true" />
         </div>
@@ -2711,18 +2704,16 @@ export default function Storefront() {
             PAN-INDIA)
           </p>
           <h2>
-            Delivered cold to your doorstep, <span>anywhere you are.</span>
+            Delivered fresh in safe packaging, <span>directly from seller to customer.</span>
           </h2>
           <p>
-            We deliver 100% raw packed juices to homes and offices across
-            Bhiwani (expanding across India soon). Freshly prepared with zero
-            added sugar and zero water, delivered fresh and cold to keep every
-            sip pure.
+            At JuiceWala, we deliver not in bottles, but in safe packaging directly from seller to customer across Bhiwani.
+            Zero middlemen, hygienic food-grade tamper-evident packs, and guaranteed fresh taste.
           </p>
         </div>
-        <a href="#juices" className="text-link">
-          Browse all juices <ArrowDown size={16} aria-hidden="true" />
-        </a>
+        <Link href="/standard-delivery" className="text-link">
+          Read safe delivery promise & customer reviews <ChevronRight size={16} aria-hidden="true" />
+        </Link>
       </section>
 
       {/* Purity & Craft Standards */}
@@ -2735,6 +2726,20 @@ export default function Storefront() {
           100% pure raw juice from fresh fruits and vegetables—zero water, zero
           preservatives, keeping pure taste and vital nutrients intact.
         </p>
+        <Link
+          href="/purity-standard"
+          className="text-link"
+          style={{
+            marginTop: 6,
+            fontWeight: 600,
+            color: "var(--forest)",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          Read Our Full Purity Standard →
+        </Link>
       </section>
 
       {/* Site Footer */}
@@ -2754,9 +2759,9 @@ export default function Storefront() {
           (Expanding Pan-India Soon).
         </p>
         <Link href="/contact">Support & Inquiries</Link>
-        <a href="#cold-chain">
-          Cold Delivery <span>Bhiwani & Expanding Soon</span>
-        </a>
+        <Link href="/standard-delivery">
+          Standard Delivery <span>Safe Packaging & Direct Delivery</span>
+        </Link>
       </footer>
 
       {/* Shopping Bag Drawer */}
@@ -2775,7 +2780,7 @@ export default function Storefront() {
           >
             <div className="drawer-header">
               <div>
-                <p className="eyebrow">COLD-CHAIN DOORSTEP DELIVERY</p>
+                <p className="eyebrow">FRESH DOORSTEP DELIVERY</p>
                 <h2 id="cart-title">
                   Your bag{" "}
                   <span
@@ -2822,7 +2827,7 @@ export default function Storefront() {
                       gap: 6,
                     }}
                   >
-                    <Check size={16} /> You have unlocked FREE Chilled Doorstep
+                    <Check size={16} /> You have unlocked FREE Doorstep
                     Delivery!
                   </span>
                 ) : (
@@ -2831,7 +2836,7 @@ export default function Storefront() {
                     <strong>
                       {formatPrice(FREE_SHIPPING_THRESHOLD - subtotal)}
                     </strong>{" "}
-                    more for <strong>FREE Cold-Chain Delivery</strong>
+                    more for <strong>FREE Doorstep Delivery</strong>
                   </span>
                 )}
               </div>
@@ -2996,8 +3001,8 @@ export default function Storefront() {
                   </div>
                   <div>
                     <span>
-                      Chilled Cold-Chain Shipping{" "}
-                      {deliveryFee === 0 && "(Free above ₹499)"}
+                      Fresh Doorstep Delivery{" "}
+                      {deliveryFee === 0 && "(Free above ₹199)"}
                     </span>
                     <strong>
                       {deliveryFee === 0 ? "FREE" : formatPrice(deliveryFee)}
@@ -3424,7 +3429,7 @@ export default function Storefront() {
                     <div>
                       {savedOrder.paymentStatus === "cancelled" ? (
                         <span className="order-status-badge cancelled">
-                          <Ban size={12} /> Cancelled / रद्द किया गया
+                          <Ban size={12} /> Cancelled
                         </span>
                       ) : savedOrder.paymentMethod === "razorpay" ? (
                         savedOrder.paymentStatus === "paid" ? (
@@ -3505,7 +3510,7 @@ export default function Storefront() {
                         disabled={orderActionLoading === savedOrder.orderId}
                         title="Update delivery details or item quantities"
                       >
-                        <Pencil size={12} /> Update / एडिट
+                        <Pencil size={12} /> Update
                       </button>
 
                       {savedOrder.paymentStatus !== "cancelled" && (
@@ -3515,7 +3520,7 @@ export default function Storefront() {
                           disabled={orderActionLoading === savedOrder.orderId}
                           title="Cancel this order"
                         >
-                          <Ban size={12} /> Cancel / रद्द करें
+                          <Ban size={12} /> Cancel
                         </button>
                       )}
 
@@ -3525,7 +3530,7 @@ export default function Storefront() {
                         disabled={orderActionLoading === savedOrder.orderId}
                         title="Remove order from history"
                       >
-                        <Trash2 size={12} /> Delete / हटाएं
+                        <Trash2 size={12} /> Delete
                       </button>
                     </div>
                   </article>
@@ -3835,9 +3840,7 @@ export default function Storefront() {
                     fontSize: 12,
                   }}
                 >
-                  {isSubmittingEdit
-                    ? "Saving Changes..."
-                    : "Save Updates / अपडेट करें"}
+                  {isSubmittingEdit ? "Saving Changes..." : "Save Updates"}
                 </button>
               </div>
             </form>
