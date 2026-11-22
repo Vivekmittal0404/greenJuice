@@ -3,16 +3,9 @@
 import {
   useState,
   useEffect,
-  useRef,
   useSyncExternalStore,
   type FormEvent,
 } from "react";
-import {
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  type ConfirmationResult,
-} from "firebase/auth";
-import { getFirebaseAuth, isFirebaseConfigured } from "./lib/firebase";
 import {
   AlertTriangle,
   ArrowDown,
@@ -867,9 +860,6 @@ export default function Storefront() {
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [demoOtpNotice, setDemoOtpNotice] = useState<string | null>(null);
 
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
-  const confirmationResultRef = useRef<ConfirmationResult | null>(null);
-
   // Check user session on initial mount
   useEffect(() => {
     let isMounted = true;
@@ -937,74 +927,20 @@ export default function Storefront() {
     setDemoOtpNotice(null);
     setIsSendingOtp(true);
 
-    // 1. Google Firebase Phone Authentication
-    if (isFirebaseConfigured()) {
-      try {
-        const auth = getFirebaseAuth();
-        if (!auth) throw new Error("Firebase auth is not initialized.");
-
-        if (!recaptchaVerifierRef.current) {
-          recaptchaVerifierRef.current = new RecaptchaVerifier(
-            auth,
-            "recaptcha-container",
-            {
-              size: "invisible",
-            },
-          );
-        }
-
-        const confirmation = await signInWithPhoneNumber(
-          auth,
-          `+91${phoneToSend}`,
-          recaptchaVerifierRef.current,
-        );
-        confirmationResultRef.current = confirmation;
-        setOtpSent(true);
-        setOtpCooldown(30);
-        setAuthSuccessMsg(`Firebase OTP sent to +91 ${phoneToSend}`);
-        setIsSendingOtp(false);
-        return;
-      } catch (err: unknown) {
-        console.error("[Firebase Phone Auth Error]", err);
-        try {
-          recaptchaVerifierRef.current?.clear();
-          recaptchaVerifierRef.current = null;
-        } catch {}
-
-        const errCode =
-          typeof err === "object" && err !== null && "code" in err
-            ? (err as { code: string }).code
-            : "";
-
-        if (errCode === "auth/invalid-phone-number") {
-          setAuthError("Invalid phone number format.");
-          setIsSendingOtp(false);
-          return;
-        }
-        if (errCode === "auth/too-many-requests") {
-          setAuthError("Too many OTP requests. Please wait a few minutes.");
-          setIsSendingOtp(false);
-          return;
-        }
-
-        const errMsg =
-          err instanceof Error
-            ? err.message
-            : "Could not send Firebase OTP.";
-        setAuthError(errMsg);
-        setIsSendingOtp(false);
-        return;
-      }
-    }
-
-    // 2. Fallback mode (when Firebase env variables are not yet entered)
     try {
       const res = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: phoneToSend }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as {
+        success?: boolean;
+        error?: string;
+        message?: string;
+        cooldownSeconds?: number;
+        demoOtp?: string;
+      };
+
       if (!res.ok || !data.success) {
         setAuthError(data.error || "Could not send OTP. Please try again.");
         if (data.cooldownSeconds) {
@@ -1042,67 +978,19 @@ export default function Storefront() {
     setAuthSuccessMsg("");
     setIsVerifyingOtp(true);
 
-    // If active Firebase confirmation result
-    if (confirmationResultRef.current) {
-      try {
-        const userCredential = await confirmationResultRef.current.confirm(
-          otpToVerify,
-        );
-        const idToken = await userCredential.user.getIdToken();
-
-        const res = await fetch("/api/auth/firebase-verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken }),
-        });
-
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          setAuthError(data.error || "Failed to verify Firebase session.");
-          setIsVerifyingOtp(false);
-          return;
-        }
-
-        const user = { phone: data.phone || phoneToVerify };
-        setCurrentUser(user);
-        setAuthToken(data.token || "");
-        try {
-          localStorage.setItem("juicewala_token", data.token || "");
-          localStorage.setItem("juicewala_phone", user.phone);
-        } catch {}
-        setIsAuthModalOpen(false);
-        setOtpSent(false);
-        setAuthOtp("");
-        setDemoOtpNotice(null);
-        confirmationResultRef.current = null;
-        setIsVerifyingOtp(false);
-        return;
-      } catch (err: unknown) {
-        console.error("[Firebase Verify Error]", err);
-        const errCode =
-          typeof err === "object" && err !== null && "code" in err
-            ? (err as { code: string }).code
-            : "";
-        const errMsg =
-          errCode === "auth/invalid-verification-code"
-            ? "Incorrect OTP. Please check the code received on your phone."
-            : errCode === "auth/code-expired"
-              ? "OTP has expired. Please request a new code."
-              : "Verification failed. Please try again.";
-        setAuthError(errMsg);
-        setIsVerifyingOtp(false);
-        return;
-      }
-    }
-
-    // Fallback API verification
     try {
       const res = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: phoneToVerify, otp: otpToVerify }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as {
+        success?: boolean;
+        error?: string;
+        token?: string;
+        phone?: string;
+      };
+
       if (!res.ok || !data.success) {
         setAuthError(data.error || "Incorrect OTP. Please try again.");
       } else {
@@ -1128,10 +1016,6 @@ export default function Storefront() {
   async function handleLogout() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
-      const auth = getFirebaseAuth();
-      if (auth) {
-        await auth.signOut();
-      }
     } catch {}
     setCurrentUser(null);
     setAuthToken("");
@@ -1142,7 +1026,6 @@ export default function Storefront() {
     setOtpSent(false);
     setAuthOtp("");
     setDemoOtpNotice(null);
-    confirmationResultRef.current = null;
   }
 
   function isBhiwaniLocation(city: string, pin: string): boolean {
@@ -4385,8 +4268,6 @@ export default function Storefront() {
           </div>
         </div>
       )}
-      {/* Invisible container for Google Firebase Phone Auth reCAPTCHA */}
-      <div id="recaptcha-container" />
     </main>
   );
 }

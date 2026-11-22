@@ -131,6 +131,8 @@ export async function requestOtp(rawPhone: string): Promise<SendOtpResult> {
 
   // Try configured SMS gateways
   const fast2SmsKey = process.env.FAST2SMS_API_KEY;
+  const fast2SmsSenderId = process.env.FAST2SMS_SENDER_ID;
+  const fast2SmsTemplateId = process.env.FAST2SMS_DLT_TEMPLATE_ID;
   const twilioSid = process.env.TWILIO_ACCOUNT_SID;
   const twilioAuth = process.env.TWILIO_AUTH_TOKEN;
   const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
@@ -138,22 +140,52 @@ export async function requestOtp(rawPhone: string): Promise<SendOtpResult> {
 
   if (fast2SmsKey) {
     try {
+      // If custom DLT Sender ID and Template ID are provided, use "dlt" route.
+      // Otherwise, use Fast2SMS pre-approved instant "otp" route (zero DLT setup required).
+      const payload =
+        fast2SmsSenderId && fast2SmsTemplateId
+          ? {
+              route: "dlt",
+              sender_id: fast2SmsSenderId.trim(),
+              message: fast2SmsTemplateId.trim(),
+              variables_values: otp,
+              numbers: phone,
+            }
+          : {
+              route: "otp",
+              variables_values: otp,
+              numbers: phone,
+            };
+
       const res = await fetch("https://www.fast2sms.com/dev/bulkV2", {
         method: "POST",
         headers: {
-          authorization: fast2SmsKey,
+          authorization: fast2SmsKey.trim(),
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          route: "otp",
-          variables_values: otp,
-          numbers: phone,
-        }),
+        body: JSON.stringify(payload),
       });
-      if (res.ok) {
+
+      const data = (await res.json()) as {
+        return?: boolean;
+        message?: string | string[];
+        status_code?: number;
+      };
+
+      if (res.ok && data.return) {
         return {
           success: true,
           message: `OTP sent to +91 ${phone}`,
+          provider: "fast2sms",
+        };
+      } else {
+        const errMsg = Array.isArray(data.message)
+          ? data.message.join(", ")
+          : data.message || "Fast2SMS error";
+        console.error("[Fast2SMS Error Response]", errMsg);
+        return {
+          success: false,
+          message: `SMS gateway error: ${errMsg}`,
           provider: "fast2sms",
         };
       }
