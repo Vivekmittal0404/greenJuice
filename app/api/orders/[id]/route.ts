@@ -1,34 +1,7 @@
 import { NextResponse } from "next/server";
+import { JUICE_CATALOG } from "@/app/lib/catalog";
 
-const catalog: Record<string, { name: string; price: number }> = {
-  "green-juice": { name: "Herbal Green Vitality", price: 60 },
-  "sweet-lime": { name: "Pure Sweet Lime (Mosambi)", price: 100 },
-  "celery-detox": { name: "Celery Deep Cleanse", price: 110 },
-  "ruby-roots": { name: "Ruby Roots (Beet & Carrot)", price: 90 },
-  "valencia-orange": { name: "Valencia Sunshine Orange", price: 110 },
-  "pomegranate-pure": { name: "Royal Pomegranate Elixir", price: 130 },
-  "watermelon-mint": { name: "Crimson Watermelon & Mint", price: 80 },
-  "golden-glow": { name: "Golden Carrot & Ginger", price: 90 },
-  "coconut-aloe": { name: "Tender Coconut & Aloe Vera", price: 95 },
-  "pineapple-digest": { name: "Pineapple Bromelain Digest", price: 100 },
-  "ginger-immunity-shot": { name: "Fiery Ginger & Turmeric Tonic", price: 70 },
-  "jamun-metabolic": { name: "Wild Jamun & Amla Balance", price: 110 },
-  "sugarcane-pure": { name: "Pure Sugarcane (ताज़ा गन्ने का जूस)", price: 40 },
-  "banana-shake": { name: "Fresh Banana Shake (ताज़ा केला शेक)", price: 50 },
-  "papaya-shake": { name: "Fresh Papaya Shake (ताज़ा पपीता शेक)", price: 50 },
-  "mosambi-pineapple-mix": {
-    name: "Mosambi Pineapple Mix (ताज़ा मौसंबी-अनानास जूस)",
-    price: 60,
-  },
-  "mosambi-pineapple-anar-mix": {
-    name: "Mosambi Pineapple Anar (मौसंबी-अनानास-अनार जूस)",
-    price: 100,
-  },
-  "banana-papaya-mix": {
-    name: "Banana Papaya Mix Shake (केला-पपीता मिक्स शेक)",
-    price: 60,
-  },
-};
+const catalog = JUICE_CATALOG;
 
 type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
@@ -214,19 +187,35 @@ export async function PATCH(request: Request, context: RouteContext) {
 
         const product = catalog[item.id];
         const quantity = item.quantity as number;
-        if (!product || quantity < 1 || quantity > 24) {
+        if ((!product && !text(item.name)) || quantity < 1 || quantity > 24) {
           return NextResponse.json(
             { error: `Invalid quantity for item ${item.id}.` },
             { status: 400 },
           );
         }
 
+        const unitPrice =
+          typeof item.price === "number" && item.price > 0
+            ? item.price
+            : typeof item.unitPrice === "number" && item.unitPrice > 0
+              ? item.unitPrice
+              : product
+                ? product.price
+                : 0;
+
+        const itemName =
+          text(item.name) && item.name.trim().length > 0
+            ? item.name.trim()
+            : product
+              ? product.name
+              : item.id;
+
         totalBottles += quantity;
         updatedOrderLines.push({
           id: item.id,
-          name: product.name,
+          name: itemName,
           quantity,
-          unitPrice: product.price,
+          unitPrice,
         });
       }
 

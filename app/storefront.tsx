@@ -65,6 +65,8 @@ export type Product = {
 type CreatedOrder = {
   orderId: string;
   amount: number;
+  subtotal?: number;
+  deliveryFee?: number;
   notificationWarning?: string;
 } & (
   | {
@@ -83,7 +85,13 @@ type SavedOrder = {
   deliveryFee?: number;
   paymentMethod: "razorpay" | "upi" | "cod";
   paymentStatus?: "pending" | "paid" | "cancelled";
-  items: Array<{ id: string; quantity: number }>;
+  items: Array<{
+    id: string;
+    quantity: number;
+    name?: string;
+    price?: number;
+    unitPrice?: number;
+  }>;
   customer?: {
     name: string;
     phone: string;
@@ -1242,9 +1250,12 @@ export default function Storefront() {
     setError("");
     setIsSubmitting(true);
     const formData = new FormData(event.currentTarget);
-    const orderedItems = cartItems.map(({ id, quantity }) => ({
-      id,
-      quantity,
+    const orderedItems = cartItems.map((item) => ({
+      id: item.id,
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      unitPrice: item.price,
     }));
 
     const name = (formData.get("name") as string) || "";
@@ -1560,6 +1571,18 @@ export default function Storefront() {
       newSubtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
     const newAmount = newSubtotal + newDeliveryFee;
 
+    const itemsWithDetails = editItems.map((item) => {
+      const prod = products.find((p) => p.id === item.id);
+      const price = prod?.price ?? 0;
+      return {
+        id: item.id,
+        name: prod?.name || item.id,
+        quantity: item.quantity,
+        price,
+        unitPrice: price,
+      };
+    });
+
     try {
       const res = await fetch(`/api/orders/${editingOrder.orderId}`, {
         method: "PATCH",
@@ -1567,7 +1590,7 @@ export default function Storefront() {
         body: JSON.stringify({
           action: "update",
           customer: editCustomer,
-          items: editItems,
+          items: itemsWithDetails,
         }),
       });
 
@@ -1589,7 +1612,7 @@ export default function Storefront() {
               phone: editCustomer.phone.trim(),
               address: editCustomer.address.trim(),
             },
-            items: editItems,
+            items: itemsWithDetails,
             subtotal: newSubtotal,
             deliveryFee: newDeliveryFee,
             amount: newAmount,

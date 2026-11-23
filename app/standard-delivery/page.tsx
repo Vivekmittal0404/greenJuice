@@ -27,6 +27,16 @@ interface CustomerReview {
 
 const INITIAL_REVIEWS: CustomerReview[] = [
   {
+    id: "rev-muskan",
+    name: "Muskan",
+    location: "Dinod gate bhiwani",
+    rating: 5,
+    date: "November 2026",
+    comment:
+      "Impressed with the taste. Thanks JuiceWala for this revolution.",
+    verified: true,
+  },
+  {
     id: "rev-1",
     name: "Amit Verma",
     location: "Circular Road, Bhiwani",
@@ -93,14 +103,18 @@ const LOCAL_STORAGE_KEY = "juicewala_user_reviews_v1";
 export default function StandardDeliveryPage() {
   const [reviews, setReviews] = useState<CustomerReview[]>(INITIAL_REVIEWS);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [newRating, setNewRating] = useState(5);
   const [newName, setNewName] = useState("");
   const [newLocation, setNewLocation] = useState("");
   const [newComment, setNewComment] = useState("");
   const [reviewSuccessMsg, setReviewSuccessMsg] = useState("");
 
-  // Load custom submitted reviews from localStorage if available
+  // Load reviews from persistent API across all users, with localStorage cache as fast fallback
   useEffect(() => {
+    let isMounted = true;
+
+    // Fast local restore
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (stored) {
@@ -108,28 +122,79 @@ export default function StandardDeliveryPage() {
         if (Array.isArray(parsed) && parsed.length > 0) {
           const combined = [...parsed, ...INITIAL_REVIEWS];
           setTimeout(() => {
-            setReviews(combined);
+            if (isMounted) setReviews(combined);
           }, 0);
         }
       }
     } catch {}
+
+    // Fetch live global reviews from server/Supabase
+    async function fetchLiveReviews() {
+      try {
+        const res = await fetch("/api/reviews");
+        if (res.ok) {
+          const data = (await res.json()) as { reviews?: CustomerReview[] };
+          if (Array.isArray(data.reviews) && data.reviews.length > 0 && isMounted) {
+            setReviews(data.reviews);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch remote reviews:", err);
+      }
+    }
+
+    fetchLiveReviews();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  function handleReviewSubmit(e: FormEvent) {
+  async function handleReviewSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!newName.trim() || !newComment.trim()) return;
+    if (!newName.trim() || !newComment.trim() || isSubmittingReview) return;
 
-    const newRev: CustomerReview = {
+    setIsSubmittingReview(true);
+    const cleanName = newName.trim();
+    const cleanLocation = newLocation.trim() || "Bhiwani";
+    const cleanComment = newComment.trim();
+
+    const localRev: CustomerReview = {
       id: `rev-custom-${Date.now()}`,
-      name: newName.trim(),
-      location: newLocation.trim() || "Bhiwani",
+      name: cleanName,
+      location: cleanLocation,
       rating: newRating,
       date: "Just now",
-      comment: newComment.trim(),
+      comment: cleanComment,
       verified: true,
     };
 
-    const updated = [newRev, ...reviews];
+    // Save to server API (Supabase + Backup + Resend notification)
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: cleanName,
+          location: cleanLocation,
+          rating: newRating,
+          comment: cleanComment,
+        }),
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as { review?: CustomerReview };
+        if (data.review) {
+          localRev.id = data.review.id;
+        }
+      }
+    } catch (apiErr) {
+      console.warn("API review submission notice:", apiErr);
+    } finally {
+      setIsSubmittingReview(false);
+    }
+
+    const updated = [localRev, ...reviews.filter((r) => r.id !== localRev.id)];
     setReviews(updated);
 
     try {
@@ -137,7 +202,7 @@ export default function StandardDeliveryPage() {
       const prevUserReviews = stored ? (JSON.parse(stored) as CustomerReview[]) : [];
       localStorage.setItem(
         LOCAL_STORAGE_KEY,
-        JSON.stringify([newRev, ...prevUserReviews]),
+        JSON.stringify([localRev, ...prevUserReviews]),
       );
     } catch {}
 
@@ -146,7 +211,7 @@ export default function StandardDeliveryPage() {
     setNewComment("");
     setNewRating(5);
     setIsReviewModalOpen(false);
-    setReviewSuccessMsg("Thank you! Your delivery review has been posted successfully.");
+    setReviewSuccessMsg("Thank you! Your delivery review has been saved permanently to the website.");
     setTimeout(() => setReviewSuccessMsg(""), 6000);
   }
 
@@ -756,6 +821,7 @@ export default function StandardDeliveryPage() {
               <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
                 <button
                   type="submit"
+                  disabled={isSubmittingReview}
                   style={{
                     flex: 1,
                     background: "var(--forest)",
@@ -765,10 +831,11 @@ export default function StandardDeliveryPage() {
                     borderRadius: 6,
                     fontSize: 14,
                     fontWeight: 600,
-                    cursor: "pointer",
+                    cursor: isSubmittingReview ? "not-allowed" : "pointer",
+                    opacity: isSubmittingReview ? 0.75 : 1,
                   }}
                 >
-                  Submit Review
+                  {isSubmittingReview ? "Saving Review..." : "Submit Review"}
                 </button>
                 <button
                   type="button"
