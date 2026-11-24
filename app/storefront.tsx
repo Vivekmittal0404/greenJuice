@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useEffect,
   useState,
   useSyncExternalStore,
   type FormEvent,
@@ -137,9 +138,81 @@ declare global {
 
 const CART_STORAGE_KEY = "root-ritual-cart-v1";
 const ORDERS_STORAGE_KEY = "root-ritual-orders-v1";
+const CUSTOMER_STORAGE_KEY = "root-ritual-customer-v1";
 const STORAGE_UNAVAILABLE = "__root_ritual_storage_unavailable__";
 const FREE_SHIPPING_THRESHOLD = 199;
 const STANDARD_SHIPPING_FEE = 20;
+
+export type SavedCustomerProfile = {
+  name: string;
+  phone: string;
+  city: string;
+  pincode: string;
+  address: string;
+};
+
+function readSavedCustomerProfile(): SavedCustomerProfile | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(CUSTOMER_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        (parsed.name || parsed.phone || parsed.address)
+      ) {
+        return {
+          name: typeof parsed.name === "string" ? parsed.name : "",
+          phone: typeof parsed.phone === "string" ? parsed.phone : "",
+          city:
+            typeof parsed.city === "string" && parsed.city.trim()
+              ? parsed.city
+              : "Bhiwani",
+          pincode: typeof parsed.pincode === "string" ? parsed.pincode : "",
+          address: typeof parsed.address === "string" ? parsed.address : "",
+        };
+      }
+    }
+
+    // Fallback: check past orders in ORDERS_STORAGE_KEY
+    const ordersRaw = window.localStorage.getItem(ORDERS_STORAGE_KEY);
+    if (ordersRaw) {
+      const ordersParsed = JSON.parse(ordersRaw);
+      if (Array.isArray(ordersParsed) && ordersParsed.length > 0) {
+        const lastOrder = ordersParsed[0];
+        if (lastOrder && lastOrder.customer) {
+          const { name = "", phone = "", address = "" } = lastOrder.customer;
+          let parsedCity = "Bhiwani";
+          let parsedPin = "";
+          let parsedStreet = address;
+
+          const pinMatch = address.match(/(?:,\s*([^,-]+))?\s*-\s*(\d{6})\s*$/);
+          if (pinMatch) {
+            if (pinMatch[1] && pinMatch[1].trim()) {
+              parsedCity = pinMatch[1].trim();
+            }
+            parsedPin = pinMatch[2] || "";
+            parsedStreet = address.slice(0, pinMatch.index).trim();
+          }
+
+          if (name || phone || address) {
+            return {
+              name,
+              phone,
+              city: parsedCity,
+              pincode: parsedPin,
+              address: parsedStreet || address,
+            };
+          }
+        }
+      }
+    }
+  } catch {
+    // Storage unavailable
+  }
+  return null;
+}
 
 function subscribeToStorage(key: string, callback: () => void) {
   const handleStorage = (event: StorageEvent) => {
@@ -1045,8 +1118,29 @@ export default function Storefront() {
   const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">(
     "razorpay",
   );
+  const [nameInput, setNameInput] = useState("");
+  const [phoneInput, setPhoneInput] = useState("");
   const [cityInput, setCityInput] = useState("Bhiwani");
   const [pincodeInput, setPincodeInput] = useState("");
+  const [addressInput, setAddressInput] = useState("");
+  const [hasAutoFilledDetails, setHasAutoFilledDetails] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const saved = readSavedCustomerProfile();
+      if (saved) {
+        if (saved.name) setNameInput(saved.name);
+        if (saved.phone) setPhoneInput(saved.phone);
+        if (saved.city) setCityInput(saved.city);
+        if (saved.pincode) setPincodeInput(saved.pincode);
+        if (saved.address) setAddressInput(saved.address);
+        if (saved.name || saved.phone || saved.address) {
+          setHasAutoFilledDetails(true);
+        }
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
   const [showLocationRestrictionModal, setShowLocationRestrictionModal] =
     useState(false);
   const [restrictedCityEntered, setRestrictedCityEntered] = useState("");
@@ -1363,6 +1457,21 @@ export default function Storefront() {
 
       writeStorageValue(CART_STORAGE_KEY, JSON.stringify({}));
 
+      const customerProfile: SavedCustomerProfile = {
+        name: name.trim(),
+        phone: phone.trim(),
+        city: city.trim(),
+        pincode: pincode.trim(),
+        address: streetAddress.trim(),
+      };
+      writeStorageValue(CUSTOMER_STORAGE_KEY, JSON.stringify(customerProfile));
+      setNameInput(name.trim());
+      setPhoneInput(phone.trim());
+      setCityInput(city.trim());
+      setPincodeInput(pincode.trim());
+      setAddressInput(streetAddress.trim());
+      setHasAutoFilledDetails(true);
+
       if (result.paymentMethod === "razorpay") {
         openRazorpayCheckout(result, {
           name: name.trim(),
@@ -1639,6 +1748,20 @@ export default function Storefront() {
     );
 
     writeStorageValue(ORDERS_STORAGE_KEY, JSON.stringify(updatedOrders));
+
+    const updatedCustomerProfile: SavedCustomerProfile = {
+      name: editCustomer.name.trim(),
+      phone: editCustomer.phone.trim(),
+      city: cityInput.trim() || "Bhiwani",
+      pincode: pincodeInput.trim(),
+      address: editCustomer.address.trim(),
+    };
+    writeStorageValue(CUSTOMER_STORAGE_KEY, JSON.stringify(updatedCustomerProfile));
+    setNameInput(editCustomer.name.trim());
+    setPhoneInput(editCustomer.phone.trim());
+    setAddressInput(editCustomer.address.trim());
+    setHasAutoFilledDetails(true);
+
     setOrderNotice(
       `Order ${editingOrder.orderId.slice(0, 8).toUpperCase()} updated successfully.`,
     );
@@ -1686,11 +1809,16 @@ export default function Storefront() {
 
       {/* Site Header */}
       <header className="site-header">
-        <a className="brand" href="#home" aria-label="JuiceWala home">
+        <a
+          className="brand"
+          href="#home"
+          aria-label="JuiceWala (juicewala / juice wala) home"
+        >
           <span className="brand-mark">
             <Leaf size={20} aria-hidden="true" />
           </span>
           <span>JuiceWala</span>
+          <span className="sr-only">juicewala - juice wala - जूसवाला</span>
         </a>
 
         <nav className="desktop-nav" aria-label="Main navigation">
@@ -1759,10 +1887,10 @@ export default function Storefront() {
             <span className="hero-title-line">ताज़ा जूस।</span>
             <span className="hero-title-line">सीधा आपके घर।</span>
           </h1>
-          <p>अब जूस मंगाना हुआ आसान।</p>
+          <p>अब जूस मंगाना हुआ आसान · JuiceWala (juicewala.shop)</p>
           <p className="hero-copy">
             ताज़े फल और सब्जियों से बना जूस। बिना मिलावट और बिना पानी मिलाए,
-            सीधे आपके दरवाज़े तक।
+            सीधे आपके दरवाज़े तक। Order pure cold juices online from JuiceWala (juicewala / juice wala).
           </p>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
             <a className="hero-cta" href="#juices">
@@ -2707,17 +2835,21 @@ export default function Storefront() {
         <a
           className="brand footer-brand"
           href="#home"
-          aria-label="JuiceWala home"
+          aria-label="JuiceWala (juicewala / juice wala) home"
         >
           <span className="brand-mark">
             <Leaf size={18} aria-hidden="true" />
           </span>
           <span>JuiceWala</span>
         </a>
-        <p>
-          JuiceWala · 100% Raw Packed Juices Delivered Fresh in Bhiwani
-          (Expanding Pan-India Soon).
-        </p>
+        <div>
+          <p>
+            JuiceWala (juicewala.shop / juice wala / जूसवाला) · 100% Raw Packed Juices Delivered Fresh in Bhiwani (Expanding Pan-India Soon).
+          </p>
+          <p style={{ marginTop: 4, fontSize: 11, color: "#a5b4a2" }}>
+            Official website: juicewala.shop · Order fresh juice online from JuiceWala (juicewala / juice wala).
+          </p>
+        </div>
         <Link href="/contact">Support & Inquiries</Link>
         <Link href="/standard-delivery">
           Standard Delivery <span>Safe Packaging & Direct Delivery</span>
@@ -2991,6 +3123,61 @@ export default function Storefront() {
                     WHERE SHOULD WE DELIVER YOUR JUICE?
                   </p>
 
+                  {hasAutoFilledDetails &&
+                    Boolean(nameInput || phoneInput || addressInput) && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          background: "#f0f6ed",
+                          border: "1px solid #d4e5cb",
+                          borderRadius: 6,
+                          padding: "7px 12px",
+                          marginBottom: 14,
+                          fontSize: 11,
+                          color: "#275e33",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 7,
+                          }}
+                        >
+                          <Check
+                            size={14}
+                            style={{ color: "#2f7a40", flexShrink: 0 }}
+                          />
+                          <span>
+                            Address & details auto-filled from your previous order
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNameInput("");
+                            setPhoneInput("");
+                            setAddressInput("");
+                            setPincodeInput("");
+                            setHasAutoFilledDetails(false);
+                          }}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            color: "var(--muted)",
+                            fontSize: 11,
+                            textDecoration: "underline",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+
                   <label>
                     Full name
                     <input
@@ -2998,6 +3185,8 @@ export default function Storefront() {
                       name="name"
                       required
                       maxLength={80}
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value)}
                       placeholder="Receiver's name"
                     />
                   </label>
@@ -3011,6 +3200,13 @@ export default function Storefront() {
                       required
                       pattern="[0-9]{10}"
                       maxLength={10}
+                      value={phoneInput}
+                      onChange={(e) => {
+                        const val = e.target.value
+                          .replace(/\D/g, "")
+                          .slice(0, 10);
+                        setPhoneInput(val);
+                      }}
                       placeholder="e.g. 9876543210"
                     />
                   </label>
@@ -3104,6 +3300,8 @@ export default function Storefront() {
                       minLength={8}
                       maxLength={250}
                       rows={2}
+                      value={addressInput}
+                      onChange={(e) => setAddressInput(e.target.value)}
                       placeholder="House / Flat No., Street, Landmark, Area"
                     />
                   </label>

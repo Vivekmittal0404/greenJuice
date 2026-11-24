@@ -11,9 +11,15 @@ import {
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Our Purity Standard | JuiceWala",
+  title: "Our Purity Standard | JuiceWala (juicewala)",
   description:
-    "Learn about JuiceWala's 100% pure fresh fruit promise. Zero added water, zero refined sugar, no preservatives, and never heat-treated.",
+    "Learn about JuiceWala's (juicewala / juice wala / जूसवाला) 100% pure fresh fruit promise. Zero added water, zero refined sugar, no preservatives, and never heat-treated.",
+  keywords: [
+    "juicewala purity",
+    "juice wala standards",
+    "juicewala raw juice",
+    "pure juice delivery bhiwani",
+  ],
 };
 
 export default function PurityStandardPage() {

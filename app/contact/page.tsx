@@ -3,8 +3,15 @@ import { ArrowLeft, Leaf, Mail, MessageCircle, Phone } from "lucide-react";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Contact Support | JuiceWala",
-  description: "Contact JuiceWala if you need help with your order.",
+  title: "Contact Support | JuiceWala (juicewala)",
+  description:
+    "Contact JuiceWala (juicewala / juice wala / जूसवाला) customer care for fresh juice orders and delivery support in Bhiwani.",
+  keywords: [
+    "juicewala contact",
+    "juicewala customer support",
+    "juice wala phone",
+    "juicewala bhiwani customer care",
+  ],
 };
 
 export default function ContactPage() {
