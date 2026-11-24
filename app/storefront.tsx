@@ -3883,7 +3883,7 @@ export default function Storefront() {
         </div>
       )}
       {/* Bottom-Right Cart Notification Popup with Go to Cart Button */}
-      {cartToast && (
+      {!isCartOpen && cartToast && (
         <aside className="cart-toast-popup" role="status" aria-live="polite">
           {cartToast.product.image ? (
             /* eslint-disable-next-line @next/next/no-img-element */
