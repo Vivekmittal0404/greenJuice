@@ -1595,17 +1595,33 @@ export default function Storefront() {
     setOrderActionLoading(orderId);
     setOrderNotice("");
 
+    const currentOrders = readSavedOrders(getOrdersSnapshot()).value;
+    const targetOrder = currentOrders.find((o) => o.orderId === orderId);
+
     try {
       await fetch(`/api/orders/${orderId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "cancel" }),
+        body: JSON.stringify({
+          action: "cancel",
+          order: targetOrder
+            ? {
+                orderId: targetOrder.orderId,
+                customer: targetOrder.customer,
+                items: targetOrder.items,
+                amount: targetOrder.amount,
+                subtotal: targetOrder.subtotal,
+                deliveryFee: targetOrder.deliveryFee,
+                paymentMethod: targetOrder.paymentMethod,
+                createdAt: targetOrder.createdAt,
+              }
+            : undefined,
+        }),
       });
     } catch (err) {
       console.warn("Cancel order API notice:", err);
     }
 
-    const currentOrders = readSavedOrders(getOrdersSnapshot()).value;
     const updatedOrders = currentOrders.map((o) =>
       o.orderId === orderId
         ? {

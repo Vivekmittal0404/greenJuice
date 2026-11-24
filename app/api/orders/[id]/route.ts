@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import fs from "fs/promises";
+import path from "path";
 import { JUICE_CATALOG } from "@/app/lib/catalog";
 
 const catalog = JUICE_CATALOG;
@@ -104,10 +106,64 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   // ACTION: CANCEL ORDER
   if (payload.action === "cancel") {
+    const orderDetails: {
+      customer_name?: string;
+      phone?: string;
+      address?: string;
+      items?: Array<{ name: string; quantity: number; unitPrice?: number }>;
+      amount_inr?: number;
+      subtotal_inr?: number;
+      delivery_fee_inr?: number;
+      payment_method?: string;
+    } = {};
+
+    // 1. Extract from client payload if provided
+    if (isRecord(payload.order)) {
+      const clientOrder = payload.order;
+      if (isRecord(clientOrder.customer)) {
+        orderDetails.customer_name = text(clientOrder.customer.name)
+          ? clientOrder.customer.name
+          : undefined;
+        orderDetails.phone = text(clientOrder.customer.phone)
+          ? clientOrder.customer.phone
+          : undefined;
+        orderDetails.address = text(clientOrder.customer.address)
+          ? clientOrder.customer.address
+          : undefined;
+      }
+      if (typeof clientOrder.amount === "number") {
+        orderDetails.amount_inr = clientOrder.amount;
+      }
+      if (text(clientOrder.paymentMethod)) {
+        orderDetails.payment_method = clientOrder.paymentMethod;
+      }
+      if (Array.isArray(clientOrder.items)) {
+        orderDetails.items = clientOrder.items.map((it) => {
+          if (isRecord(it)) {
+            const itemName = text(it.name)
+              ? it.name
+              : text(it.id)
+                ? (catalog[it.id]?.name || it.id)
+                : "Fresh Juice";
+            const qty = typeof it.quantity === "number" ? it.quantity : 1;
+            const price =
+              typeof it.price === "number"
+                ? it.price
+                : typeof it.unitPrice === "number"
+                  ? it.unitPrice
+                  : 0;
+            return { name: itemName, quantity: qty, unitPrice: price };
+          }
+          return { name: "Fresh Juice", quantity: 1, unitPrice: 0 };
+        });
+      }
+    }
+
+    // 2. Update Supabase and fetch order details if available
     if (supabaseUrl && supabaseKey) {
       try {
         const updateResponse = await fetch(
-          `${supabaseUrl}/rest/v1/orders?id=eq.${id}`,
+          `${supabaseUrl}/rest/v1/orders?id=eq.${id}&select=*`,
           {
             method: "PATCH",
             headers: {
@@ -123,11 +179,203 @@ export async function PATCH(request: Request, context: RouteContext) {
           },
         );
 
-        if (!updateResponse.ok) {
+        if (updateResponse.ok) {
+          const updatedRows: unknown = await updateResponse
+            .json()
+            .catch(() => null);
+          if (
+            Array.isArray(updatedRows) &&
+            updatedRows.length > 0 &&
+            isRecord(updatedRows[0])
+          ) {
+            const row = updatedRows[0];
+            if (text(row.customer_name)) orderDetails.customer_name = row.customer_name;
+            if (text(row.phone)) orderDetails.phone = row.phone;
+            if (text(row.address)) orderDetails.address = row.address;
+            if (typeof row.amount_inr === "number")
+              orderDetails.amount_inr = row.amount_inr;
+            if (text(row.payment_method))
+              orderDetails.payment_method = row.payment_method;
+            if (
+              Array.isArray(row.items) &&
+              (!orderDetails.items || orderDetails.items.length === 0)
+            ) {
+              orderDetails.items = row.items.map((it: unknown) => {
+                if (isRecord(it)) {
+                  const itName = text(it.name)
+                    ? it.name
+                    : text(it.id)
+                      ? (catalog[it.id]?.name || it.id)
+                      : "Fresh Juice";
+                  const itQty =
+                    typeof it.quantity === "number" ? it.quantity : 1;
+                  const itPrice =
+                    typeof it.unitPrice === "number" ? it.unitPrice : 0;
+                  return {
+                    name: itName,
+                    quantity: itQty,
+                    unitPrice: itPrice,
+                  };
+                }
+                return { name: "Fresh Juice", quantity: 1, unitPrice: 0 };
+              });
+            }
+          }
+        } else {
           console.error("Failed to cancel order in DB:", updateResponse.status);
         }
       } catch (err) {
         console.error("Supabase cancel order error:", err);
+      }
+    }
+
+    // 3. Update local orders_backup.json
+    try {
+      const backupPath = path.join(process.cwd(), "orders_backup.json");
+      const existing = await fs.readFile(backupPath, "utf-8").catch(() => null);
+      if (existing) {
+        const backupList: unknown = JSON.parse(existing);
+        if (Array.isArray(backupList)) {
+          let found = false;
+          const updatedList = backupList.map((entry) => {
+            if (isRecord(entry) && entry.id === id) {
+              found = true;
+              if (!orderDetails.customer_name && text(entry.customer_name))
+                orderDetails.customer_name = entry.customer_name;
+              if (!orderDetails.phone && text(entry.phone))
+                orderDetails.phone = entry.phone;
+              if (!orderDetails.address && text(entry.address))
+                orderDetails.address = entry.address;
+              if (
+                !orderDetails.amount_inr &&
+                typeof entry.amount_inr === "number"
+              )
+                orderDetails.amount_inr = entry.amount_inr;
+              if (!orderDetails.payment_method && text(entry.payment_method))
+                orderDetails.payment_method = entry.payment_method;
+              if (
+                (!orderDetails.items || orderDetails.items.length === 0) &&
+                Array.isArray(entry.items)
+              ) {
+                orderDetails.items = entry.items.map((it) => {
+                  if (isRecord(it)) {
+                    return {
+                      name: text(it.name) ? it.name : "Fresh Juice",
+                      quantity:
+                        typeof it.quantity === "number" ? it.quantity : 1,
+                      unitPrice:
+                        typeof it.unitPrice === "number" ? it.unitPrice : 0,
+                    };
+                  }
+                  return { name: "Fresh Juice", quantity: 1, unitPrice: 0 };
+                });
+              }
+              return {
+                ...entry,
+                payment_status: "cancelled",
+                cancelled_at: new Date().toISOString(),
+              };
+            }
+            return entry;
+          });
+          if (found) {
+            await fs.writeFile(
+              backupPath,
+              JSON.stringify(updatedList, null, 2),
+              "utf-8",
+            );
+          }
+        }
+      }
+    } catch (backupErr) {
+      console.error("Local backup cancel update error:", backupErr);
+    }
+
+    // 4. Send Order Cancellation Notification Email via Resend to Store Owner
+    const resendApiKey = process.env.RESEND_API_KEY?.trim();
+    const notificationEmail = process.env.ORDER_NOTIFICATION_EMAIL?.trim();
+    const senderEmail = process.env.RESEND_FROM_EMAIL?.trim();
+
+    let emailSent = false;
+    if (resendApiKey && notificationEmail && senderEmail) {
+      const orderRef = id.slice(0, 8).toUpperCase();
+      const customerName = orderDetails.customer_name || "Customer";
+      const customerPhone = orderDetails.phone || "Not specified";
+      const customerAddress = orderDetails.address || "Not specified";
+      const totalAmount =
+        typeof orderDetails.amount_inr === "number"
+          ? `Rs ${orderDetails.amount_inr}`
+          : "N/A";
+      const paymentMethodStr =
+        orderDetails.payment_method === "razorpay"
+          ? "Razorpay (Online Payment)"
+          : "Cash on delivery (COD)";
+
+      const itemsText =
+        orderDetails.items && orderDetails.items.length > 0
+          ? orderDetails.items
+              .map(
+                (item) =>
+                  `- ${item.name} x${item.quantity}${
+                    item.unitPrice
+                      ? ` (Rs ${item.unitPrice * item.quantity})`
+                      : ""
+                  }`,
+              )
+              .join("\n")
+          : "- Items not specified";
+
+      const cancelEmailText = [
+        `❌ ORDER CANCELLED: #${orderRef}`,
+        `Status: CANCELLED BY CUSTOMER`,
+        `Cancellation Time: ${new Date().toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+        })}`,
+        "",
+        `Customer: ${customerName}`,
+        `Phone: ${customerPhone}`,
+        `Delivery address: ${customerAddress}`,
+        "",
+        "Cancelled Items:",
+        itemsText,
+        "",
+        `Total Order Amount: ${totalAmount}`,
+        `Payment Method: ${paymentMethodStr}`,
+        "",
+        "⚠️ PLEASE NOTE: Do NOT prepare, pack, or dispatch this order.",
+      ].join("\n");
+
+      try {
+        const emailResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${resendApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: senderEmail,
+            to: [notificationEmail],
+            subject: `❌ Order CANCELLED: #${orderRef} - ${totalAmount} (${customerName})`,
+            text: cancelEmailText,
+          }),
+          signal: AbortSignal.timeout(10_000),
+          cache: "no-store",
+        });
+
+        const emailPayload: unknown = await emailResponse
+          .json()
+          .catch(() => null);
+        emailSent =
+          emailResponse.ok && isRecord(emailPayload) && text(emailPayload.id);
+
+        if (!emailSent) {
+          console.error(
+            "Cancellation email was not accepted by Resend:",
+            emailResponse.status,
+          );
+        }
+      } catch (mailErr) {
+        console.error("Cancellation email failed to reach Resend:", mailErr);
       }
     }
 
@@ -136,6 +384,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       action: "cancel",
       orderId: id,
       paymentStatus: "cancelled",
+      cancellationEmailSent: emailSent,
       message: "Order has been cancelled successfully.",
     });
   }
