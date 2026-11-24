@@ -496,10 +496,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     // If Supabase is configured, update the DB record
+    let existingDbOrder: Record<string, unknown> | null = null;
     if (supabaseUrl && supabaseKey) {
       try {
         const updateResponse = await fetch(
-          `${supabaseUrl}/rest/v1/orders?id=eq.${id}`,
+          `${supabaseUrl}/rest/v1/orders?id=eq.${id}&select=*`,
           {
             method: "PATCH",
             headers: {
@@ -513,11 +514,184 @@ export async function PATCH(request: Request, context: RouteContext) {
           },
         );
 
-        if (!updateResponse.ok) {
-          console.error("DB order update response error:", updateResponse.status);
+        if (updateResponse.ok) {
+          const rows: unknown = await updateResponse
+            .json()
+            .catch(() => null);
+          if (Array.isArray(rows) && rows.length > 0 && isRecord(rows[0])) {
+            existingDbOrder = rows[0];
+          }
+        } else {
+          console.error(
+            "DB order update response error:",
+            updateResponse.status,
+          );
         }
       } catch (err) {
         console.error("Supabase update order error:", err);
+      }
+    }
+
+    // Update local orders_backup.json
+    try {
+      const backupPath = path.join(process.cwd(), "orders_backup.json");
+      const existing = await fs.readFile(backupPath, "utf-8").catch(() => null);
+      if (existing) {
+        const backupList: unknown = JSON.parse(existing);
+        if (Array.isArray(backupList)) {
+          const updatedList = backupList.map((entry) => {
+            if (isRecord(entry) && entry.id === id) {
+              return {
+                ...entry,
+                ...updateBody,
+                updated_at: new Date().toISOString(),
+              };
+            }
+            return entry;
+          });
+          await fs.writeFile(
+            backupPath,
+            JSON.stringify(updatedList, null, 2),
+            "utf-8",
+          );
+        }
+      }
+    } catch (backupErr) {
+      console.error("Local backup update error:", backupErr);
+    }
+
+    // Send Order Update Notification Email via Resend to Store Owner
+    const resendApiKey = process.env.RESEND_API_KEY?.trim();
+    const notificationEmail = process.env.ORDER_NOTIFICATION_EMAIL?.trim();
+    const senderEmail = process.env.RESEND_FROM_EMAIL?.trim();
+
+    let emailSent = false;
+    if (resendApiKey && notificationEmail && senderEmail) {
+      const orderRef = id.slice(0, 8).toUpperCase();
+      const custName =
+        (text(updateBody.customer_name) ? updateBody.customer_name : undefined) ||
+        (existingDbOrder && text(existingDbOrder.customer_name)
+          ? existingDbOrder.customer_name
+          : undefined) ||
+        "Customer";
+      const custPhone =
+        (text(updateBody.phone) ? updateBody.phone : undefined) ||
+        (existingDbOrder && text(existingDbOrder.phone)
+          ? existingDbOrder.phone
+          : undefined) ||
+        "Not specified";
+      const custAddress =
+        (text(updateBody.address) ? updateBody.address : undefined) ||
+        (existingDbOrder && text(existingDbOrder.address)
+          ? existingDbOrder.address
+          : undefined) ||
+        "Not specified";
+
+      const finalAmount =
+        typeof newAmount === "number"
+          ? newAmount
+          : existingDbOrder && typeof existingDbOrder.amount_inr === "number"
+            ? existingDbOrder.amount_inr
+            : undefined;
+      const totalAmountStr =
+        typeof finalAmount === "number" ? `Rs ${finalAmount}` : "N/A";
+
+      const payMethod =
+        (text(payload.paymentMethod) ? payload.paymentMethod : undefined) ||
+        (existingDbOrder && text(existingDbOrder.payment_method)
+          ? existingDbOrder.payment_method
+          : undefined) ||
+        "cod";
+      const payMethodStr =
+        payMethod === "razorpay"
+          ? "Razorpay (Online Payment)"
+          : "Cash on delivery (COD)";
+
+      const itemsToReport =
+        updatedOrderLines ||
+        (existingDbOrder && Array.isArray(existingDbOrder.items)
+          ? (existingDbOrder.items as Array<Record<string, unknown>>)
+          : []);
+
+      const itemsText =
+        itemsToReport.length > 0
+          ? itemsToReport
+              .map((item) => {
+                if (isRecord(item)) {
+                  const name = text(item.name) ? item.name : "Juice";
+                  const qty =
+                    typeof item.quantity === "number" ? item.quantity : 1;
+                  const unitPrice =
+                    typeof item.unitPrice === "number" ? item.unitPrice : 0;
+                  return `- ${name} x${qty}${
+                    unitPrice ? ` (Rs ${unitPrice * qty})` : ""
+                  }`;
+                }
+                return "- Juice";
+              })
+              .join("\n")
+          : "- No items specified";
+
+      const updateEmailLines = [
+        `✏️ ORDER UPDATED: #${orderRef}`,
+        `Status: UPDATED BY CUSTOMER`,
+        `Update Time: ${new Date().toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+        })}`,
+        "",
+        `Customer: ${custName}`,
+        `Phone: ${custPhone}`,
+        `Delivery Address: ${custAddress}`,
+        "",
+        "Updated Order Items:",
+        itemsText,
+        "",
+      ];
+
+      if (typeof newSubtotal === "number") {
+        updateEmailLines.push(`Subtotal: Rs ${newSubtotal}`);
+      }
+      if (typeof newDeliveryFee === "number") {
+        updateEmailLines.push(`Delivery Fee: Rs ${newDeliveryFee}`);
+      }
+      updateEmailLines.push(
+        `Total Order Amount: ${totalAmountStr}`,
+        `Payment Method: ${payMethodStr}`,
+        "",
+        "ℹ️ PLEASE NOTE: Customer has modified this order. Please prepare and dispatch the UPDATED items and address above.",
+      );
+
+      try {
+        const emailResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${resendApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: senderEmail,
+            to: [notificationEmail],
+            subject: `✏️ Order UPDATED: #${orderRef} - ${totalAmountStr} (${custName})`,
+            text: updateEmailLines.join("\n"),
+          }),
+          signal: AbortSignal.timeout(10_000),
+          cache: "no-store",
+        });
+
+        const emailPayload: unknown = await emailResponse
+          .json()
+          .catch(() => null);
+        emailSent =
+          emailResponse.ok && isRecord(emailPayload) && text(emailPayload.id);
+
+        if (!emailSent) {
+          console.error(
+            "Order update email was not accepted by Resend:",
+            emailResponse.status,
+          );
+        }
+      } catch (mailErr) {
+        console.error("Order update email failed to reach Resend:", mailErr);
       }
     }
 
@@ -530,6 +704,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       deliveryFee: newDeliveryFee,
       amount: newAmount,
       items: updatedOrderLines,
+      updateEmailSent: emailSent,
       message: "Order updated successfully.",
     });
   }

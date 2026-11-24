@@ -12,6 +12,10 @@ export const JUICE_CATALOG: Record<string, CatalogItem> = {
     price: 150,
   },
   "sugarcane-pure": { name: "Pure Sugarcane (ताज़ा गन्ने का जूस)", price: 40 },
+  "coconut-water": {
+    name: "Pure Tender Coconut Water (ताज़ा नारियल पानी)",
+    price: 60,
+  },
   "banana-shake": { name: "Fresh Banana Shake (ताज़ा केला शेक)", price: 50 },
   "papaya-shake": { name: "Fresh Papaya Shake (ताज़ा पपीता शेक)", price: 50 },
   "mosambi-pineapple-mix": {

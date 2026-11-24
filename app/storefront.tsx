@@ -515,6 +515,42 @@ export const products: Product[] = [
     volume: "300 ml",
   },
   {
+    id: "coconut-water",
+    name: "Pure Tender Coconut Water (ताज़ा नारियल पानी)",
+    subtitle: "Fresh Green Tender Coconut Water",
+    category: "hydration",
+    categoryLabel: "Hydration & Wellness",
+    description:
+      "100% pure tender coconut water straight from fresh green coconuts. Naturally sweet, full of essential electrolytes, and ultra-hydrating with zero added water or sugar.",
+    fullStory:
+      "Harvested straight from fresh green tender coconuts with zero added water, zero sugar, and no preservatives. Packed with natural potassium, magnesium, and essential electrolytes to instantly cool your body and quench your thirst.",
+    ingredients: [
+      "100% Pure Tender Coconut Water (ताज़ा नारियल पानी)",
+      "Natural Tender Coconut Pulp (मलाई)",
+    ],
+    benefits: [
+      "Instant Natural Hydration",
+      "Rich in Potassium & Electrolytes",
+      "Zero Added Sugar & Zero Water",
+      "Cools Body & Boosts Digestion",
+    ],
+    tasteProfile:
+      "Naturally sweet, crisp, light, and deeply refreshing",
+    bestTime: "Morning empty stomach, post-workout, or hot afternoons",
+    nutrition: {
+      calories: "45 kcal",
+      vitaminC: "25% RDA",
+      sugar: "0g Added Sugar",
+    },
+    price: 60,
+    image: "/images/coconut-water.jpg",
+    color: "#5a9e3a",
+    hoverNote:
+      "100% natural tender coconut water straight from fresh green coconuts. Zero added sugar or water.",
+    tag: "Pure Hydration",
+    volume: "300 ml",
+  },
+  {
     id: "banana-shake",
     name: "Fresh Banana Shake (ताज़ा केला शेक)",
     subtitle: "Rich & Creamy Energy Shake",
@@ -1681,6 +1717,21 @@ export default function Storefront() {
   }
 
   function changeEditItemQuantity(productId: string, delta: number) {
+    if (delta > 0) {
+      const buttonKey = `edit-${productId}`;
+      setAnimatingButtonId(buttonKey);
+      setAnimatingQtyId(productId);
+      setTimeout(() => {
+        setAnimatingButtonId((curr) => (curr === buttonKey ? null : curr));
+        setAnimatingQtyId((curr) => (curr === productId ? null : curr));
+      }, 850);
+    } else {
+      setAnimatingQtyId(productId);
+      setTimeout(() => {
+        setAnimatingQtyId((curr) => (curr === productId ? null : curr));
+      }, 450);
+    }
+
     setEditItems((current) => {
       const existing = current.find((it) => it.id === productId);
       if (!existing && delta > 0) {
@@ -1733,6 +1784,7 @@ export default function Storefront() {
           action: "update",
           customer: editCustomer,
           items: itemsWithDetails,
+          paymentMethod: editingOrder.paymentMethod,
         }),
       });
 
@@ -4105,19 +4157,129 @@ export default function Storefront() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span>{item.quantity}</span>
+                            <span
+                              style={{
+                                transform:
+                                  animatingQtyId === item.id
+                                    ? "scale(1.25)"
+                                    : "scale(1)",
+                                transition: "transform 0.15s ease",
+                                display: "inline-block",
+                              }}
+                            >
+                              {item.quantity}
+                            </span>
                             <button
                               type="button"
                               onClick={() => changeEditItemQuantity(item.id, 1)}
                               aria-label="Increase quantity"
+                              className={
+                                animatingButtonId === `edit-${item.id}`
+                                  ? "button-star-bounce"
+                                  : ""
+                              }
+                              style={{ position: "relative" }}
                             >
                               <Plus size={13} />
+                              {animatingButtonId === `edit-${item.id}` && (
+                                <span
+                                  className="star-burst-container"
+                                  aria-hidden="true"
+                                >
+                                  <span className="star-particle star-p1">★</span>
+                                  <span className="star-particle star-p2">✦</span>
+                                  <span className="star-particle star-p3">★</span>
+                                  <span className="star-particle star-p4">✦</span>
+                                  <span className="star-particle star-p5">★</span>
+                                  <span className="star-particle star-p6">✨</span>
+                                  <span className="star-particle star-p7">★</span>
+                                  <span className="star-particle star-p8">✦</span>
+                                </span>
+                              )}
                             </button>
                           </div>
                         </div>
                       );
                     })}
                   </div>
+
+                  {/* Quick Add More Juices to this Order */}
+                  {(() => {
+                    const unaddedProducts = products.filter(
+                      (p) => !editItems.some((it) => it.id === p.id),
+                    );
+                    if (unaddedProducts.length === 0) return null;
+
+                    return (
+                      <div
+                        style={{
+                          marginTop: 10,
+                          paddingTop: 10,
+                          borderTop: "1px dashed var(--line)",
+                        }}
+                      >
+                        <p
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "var(--muted)",
+                            margin: "0 0 8px",
+                          }}
+                        >
+                          Add more juices to your order:
+                        </p>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 6,
+                          }}
+                        >
+                          {unaddedProducts.map((prod) => (
+                            <button
+                              key={prod.id}
+                              type="button"
+                              onClick={() => changeEditItemQuantity(prod.id, 1)}
+                              className={`add-button ${
+                                animatingButtonId === `edit-${prod.id}`
+                                  ? "button-star-bounce"
+                                  : ""
+                              }`}
+                              style={{
+                                padding: "4px 10px",
+                                height: 28,
+                                minWidth: "auto",
+                                fontSize: 11,
+                                borderRadius: 18,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                position: "relative",
+                              }}
+                            >
+                              <Plus size={12} /> {prod.name} (
+                              {formatPrice(prod.price)})
+                              {animatingButtonId === `edit-${prod.id}` && (
+                                <span
+                                  className="star-burst-container"
+                                  aria-hidden="true"
+                                >
+                                  <span className="star-particle star-p1">★</span>
+                                  <span className="star-particle star-p2">✦</span>
+                                  <span className="star-particle star-p3">★</span>
+                                  <span className="star-particle star-p4">✦</span>
+                                  <span className="star-particle star-p5">★</span>
+                                  <span className="star-particle star-p6">✨</span>
+                                  <span className="star-particle star-p7">★</span>
+                                  <span className="star-particle star-p8">✦</span>
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Pricing preview */}
                   {(() => {
