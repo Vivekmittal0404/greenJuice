@@ -318,7 +318,9 @@ export default function PurityStandardPage() {
               background: "var(--white)",
               border: "1px solid var(--line)",
               borderRadius: 8,
-              overflow: "hidden",
+              overflowX: "auto",
+              WebkitOverflowScrolling: "touch",
+              maxWidth: "100%",
             }}
           >
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>

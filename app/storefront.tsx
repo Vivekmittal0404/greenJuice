@@ -11,12 +11,16 @@ import {
   Check,
   ChevronRight,
   ClipboardList,
+  Clock3,
   Droplets,
   Info,
   Leaf,
+  Mail,
   MapPin,
+  MessageCircle,
   Minus,
   Pencil,
+  Phone,
   Plus,
   Search,
   ShoppingBag,
@@ -1030,6 +1034,7 @@ export default function Storefront() {
   const [storageWarning, setStorageWarning] = useState("");
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [order, setOrder] = useState<CreatedOrder | null>(null);
@@ -1220,6 +1225,7 @@ export default function Storefront() {
 
   function openCart() {
     setIsOrdersOpen(false);
+    setIsSupportOpen(false);
     setOrder(null);
     setError("");
     setCartToast(null);
@@ -1228,6 +1234,7 @@ export default function Storefront() {
 
   function handleBrowseJuices() {
     setIsCartOpen(false);
+    setIsSupportOpen(false);
     setActiveCategory("all");
     setSearchQuery("");
     setTimeout(() => {
@@ -1242,7 +1249,17 @@ export default function Storefront() {
 
   function openOrders() {
     setIsCartOpen(false);
+    setIsSupportOpen(false);
     setIsOrdersOpen(true);
+  }
+
+  function openSupport() {
+    setIsCartOpen(false);
+    setIsOrdersOpen(false);
+    setOrder(null);
+    setError("");
+    setCartToast(null);
+    setIsSupportOpen(true);
   }
 
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
@@ -1680,10 +1697,27 @@ export default function Storefront() {
           <a href="#juices">The Juices</a>
           <Link href="/standard-delivery">Standard Delivery</Link>
           <Link href="/purity-standard">Our Purity Standard</Link>
-          <Link href="/contact">Support</Link>
+          <Link
+            href="/contact"
+            onClick={(e) => {
+              e.preventDefault();
+              openSupport();
+            }}
+          >
+            Support
+          </Link>
         </nav>
 
         <div className="header-actions">
+          <button
+            type="button"
+            className="support-button"
+            onClick={openSupport}
+            aria-label="Customer Support"
+          >
+            <Phone size={17} aria-hidden="true" />
+            <span>Support</span>
+          </button>
           <button className="orders-button" onClick={openOrders}>
             <ClipboardList size={18} aria-hidden="true" />
             <span>My orders</span>
@@ -1721,10 +1755,9 @@ export default function Storefront() {
           <p className="eyebrow hero-eyebrow">
             <span /> 100% RAW PACKED JUICES · DELIVERING ON TIME
           </p>
-          <h1>
-            ताज़ा जूस।
-            <br />
-            सीधा आपके घर।
+          <h1 className="hero-title">
+            <span className="hero-title-line">ताज़ा जूस।</span>
+            <span className="hero-title-line">सीधा आपके घर।</span>
           </h1>
           <p>अब जूस मंगाना हुआ आसान।</p>
           <p className="hero-copy">
@@ -1771,165 +1804,62 @@ export default function Storefront() {
       </section>
 
       {/* Startup Value Pillars */}
-      <section
-        style={{
-          background: "#183b2b",
-          color: "#fffefa",
-          padding: "42px 7.6%",
-          borderBottom: "1px solid rgba(255,255,255,0.12)",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 1320,
-            margin: "0 auto",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
-            gap: 28,
-          }}
-        >
-          <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-            <div
-              style={{
-                background: "#d9e68c",
-                color: "#183b2b",
-                padding: 10,
-                borderRadius: "50%",
-                flexShrink: 0,
-              }}
-            >
+      <section className="startup-pillars-section">
+        <div className="startup-pillars-grid">
+          <div className="startup-pillar-item">
+            <div className="startup-pillar-icon">
               <Sparkles size={20} />
             </div>
             <div>
-              <strong
-                style={{
-                  display: "block",
-                  fontSize: 14,
-                  fontFamily: "var(--serif)",
-                  marginBottom: 4,
-                }}
-              >
+              <strong className="startup-pillar-title">
                 Real Fruits. Real Freshness.
               </strong>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 12,
-                  color: "#d0d9cf",
-                  lineHeight: 1.55,
-                }}
-              >
+              <p className="startup-pillar-desc">
                 Enjoy fresh fruit and vegetable juices, carefully prepared and
                 delivered to your doorstep.
               </p>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-            <div
-              style={{
-                background: "#d9e68c",
-                color: "#183b2b",
-                padding: 10,
-                borderRadius: "50%",
-                flexShrink: 0,
-              }}
-            >
+          <div className="startup-pillar-item">
+            <div className="startup-pillar-icon">
               <Droplets size={20} />
             </div>
             <div>
-              <strong
-                style={{
-                  display: "block",
-                  fontSize: 14,
-                  fontFamily: "var(--serif)",
-                  marginBottom: 4,
-                }}
-              >
+              <strong className="startup-pillar-title">
                 Zero Water & Color
               </strong>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 12,
-                  color: "#d0d9cf",
-                  lineHeight: 1.55,
-                }}
-              >
+              <p className="startup-pillar-desc">
                 Made with fresh fruits and vegetables. No added water, sugar or
                 artificial colours. Just the natural taste of fresh ingredients!
               </p>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-            <div
-              style={{
-                background: "#d9e68c",
-                color: "#183b2b",
-                padding: 10,
-                borderRadius: "50%",
-                flexShrink: 0,
-              }}
-            >
+          <div className="startup-pillar-item">
+            <div className="startup-pillar-icon">
               <Snowflake size={20} />
             </div>
             <div>
-              <strong
-                style={{
-                  display: "block",
-                  fontSize: 14,
-                  fontFamily: "var(--serif)",
-                  marginBottom: 4,
-                }}
-              >
+              <strong className="startup-pillar-title">
                 Packed Fresh. Delivered Safely.
               </strong>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 12,
-                  color: "#d0d9cf",
-                  lineHeight: 1.55,
-                }}
-              >
+              <p className="startup-pillar-desc">
                 We pack your order freshly and ship it to you with extra care to
                 keep your juice refreshing on its way.
               </p>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-            <div
-              style={{
-                background: "#d9e68c",
-                color: "#183b2b",
-                padding: 10,
-                borderRadius: "50%",
-                flexShrink: 0,
-              }}
-            >
+          <div className="startup-pillar-item">
+            <div className="startup-pillar-icon">
               <Truck size={20} />
             </div>
             <div>
-              <strong
-                style={{
-                  display: "block",
-                  fontSize: 14,
-                  fontFamily: "var(--serif)",
-                  marginBottom: 4,
-                }}
-              >
+              <strong className="startup-pillar-title">
                 Doorstep Delivery
               </strong>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 12,
-                  color: "#d0d9cf",
-                  lineHeight: 1.55,
-                }}
-              >
+              <p className="startup-pillar-desc">
                 Shipping across all areas in Bhiwani only. We will expand our
                 services soon in all India.
               </p>
@@ -2024,6 +1954,8 @@ export default function Storefront() {
               display: "flex",
               gap: 8,
               overflowX: "auto",
+              maxWidth: "100%",
+              WebkitOverflowScrolling: "touch",
               paddingBottom: 6,
               scrollbarWidth: "none",
             }}
@@ -3576,6 +3508,193 @@ export default function Storefront() {
         </div>
       )}
 
+      {/* Customer Support Drawer */}
+      {isSupportOpen && (
+        <div
+          className="drawer-backdrop"
+          onMouseDown={(event) =>
+            event.target === event.currentTarget && setIsSupportOpen(false)
+          }
+        >
+          <aside
+            className="cart-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="support-title"
+          >
+            <div className="drawer-header">
+              <div>
+                <p className="eyebrow">JUICEWALA · CUSTOMER CARE</p>
+                <h2 id="support-title">Need help? / सहायता</h2>
+              </div>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setIsSupportOpen(false)}
+                aria-label="Close support"
+              >
+                <X size={21} />
+              </button>
+            </div>
+
+            <div style={{ marginTop: 20 }}>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "var(--muted)",
+                  lineHeight: 1.6,
+                  marginBottom: 20,
+                }}
+              >
+                If you get stuck while ordering or need help with an existing
+                order, contact our Bhiwani support team using any option below.
+              </p>
+
+              <div
+                className="support-options"
+                style={{ gridTemplateColumns: "1fr", gap: 12 }}
+              >
+                <a
+                  className="support-option"
+                  href="tel:+919896962782"
+                  style={{
+                    minHeight: "auto",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: "16px 18px",
+                    borderRadius: 6,
+                  }}
+                >
+                  <span className="support-icon" style={{ flexShrink: 0 }}>
+                    <Phone size={20} aria-hidden="true" />
+                  </span>
+                  <span>
+                    <span className="support-label">Call us directly</span>
+                    <strong style={{ fontSize: 14 }}>+91 98969 62782</strong>
+                  </span>
+                </a>
+
+                <a
+                  className="support-option"
+                  href="https://wa.me/919896962782?text=Hello%20JuiceWala%2C%20I%20need%20help%20with%20an%20order."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    minHeight: "auto",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: "16px 18px",
+                    borderRadius: 6,
+                  }}
+                >
+                  <span
+                    className="support-icon"
+                    style={{
+                      flexShrink: 0,
+                      background: "#25D366",
+                      color: "#ffffff",
+                    }}
+                  >
+                    <MessageCircle size={20} aria-hidden="true" />
+                  </span>
+                  <span>
+                    <span className="support-label">WhatsApp</span>
+                    <strong style={{ fontSize: 14 }}>Chat with support</strong>
+                  </span>
+                </a>
+
+                <a
+                  className="support-option"
+                  href="mailto:vivekmittal0404@gmail.com"
+                  style={{
+                    minHeight: "auto",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: "16px 18px",
+                    borderRadius: 6,
+                  }}
+                >
+                  <span className="support-icon" style={{ flexShrink: 0 }}>
+                    <Mail size={20} aria-hidden="true" />
+                  </span>
+                  <span>
+                    <span className="support-label">Email us</span>
+                    <strong style={{ fontSize: 14 }}>
+                      vivekmittal0404@gmail.com
+                    </strong>
+                  </span>
+                </a>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 22,
+                  padding: "14px 16px",
+                  background: "#f0f4ec",
+                  borderRadius: 6,
+                  border: "1px solid #d9e3d2",
+                  fontSize: 12,
+                  color: "var(--forest)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontWeight: 600,
+                  }}
+                >
+                  <Clock3 size={15} />
+                  <span>Support Hours: 7:00 AM – 9:00 PM (Daily)</span>
+                </div>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 11,
+                    color: "var(--muted)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Doorstep fresh juice delivery across all sectors and areas in
+                  Bhiwani (PIN 127xxx).
+                </p>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 24,
+                  paddingTop: 16,
+                  borderTop: "1px solid var(--line)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Link
+                  href="/contact"
+                  onClick={() => setIsSupportOpen(false)}
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--forest)",
+                    textDecoration: "underline",
+                  }}
+                >
+                  Open dedicated support page →
+                </Link>
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
+
       {/* Edit Order Modal Dialog */}
       {editingOrder && (
         <div
@@ -3883,7 +4002,7 @@ export default function Storefront() {
         </div>
       )}
       {/* Bottom-Right Cart Notification Popup with Go to Cart Button */}
-      {!isCartOpen && cartToast && (
+      {!isCartOpen && !isSupportOpen && cartToast && (
         <aside className="cart-toast-popup" role="status" aria-live="polite">
           {cartToast.product.image ? (
             /* eslint-disable-next-line @next/next/no-img-element */
