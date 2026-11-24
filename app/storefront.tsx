@@ -507,7 +507,7 @@ export const products: Product[] = [
       sugar: "0g Added Sugar",
     },
     price: 40,
-    image: "/images/sugarcane.webp",
+    image: "/images/sugarcane.jpg",
     color: "#a4b954",
     hoverNote:
       "100% natural fresh sugarcane juice with ginger, mint, and lemon. No water added.",
@@ -534,15 +534,14 @@ export const products: Product[] = [
       "Zero Added Sugar & Zero Water",
       "Cools Body & Boosts Digestion",
     ],
-    tasteProfile:
-      "Naturally sweet, crisp, light, and deeply refreshing",
+    tasteProfile: "Naturally sweet, crisp, light, and deeply refreshing",
     bestTime: "Morning empty stomach, post-workout, or hot afternoons",
     nutrition: {
       calories: "45 kcal",
       vitaminC: "25% RDA",
       sugar: "0g Added Sugar",
     },
-    price: 60,
+    price: 100,
     image: "/images/coconut-water.jpg",
     color: "#5a9e3a",
     hoverNote:
@@ -698,8 +697,7 @@ export const products: Product[] = [
     ],
     tasteProfile:
       "Deeply flavorful ruby tart-sweetness, lush pomegranate depth with bright citrus sparkle",
-    bestTime:
-      "Afternoon vitality tonic or pre-workout stamina builder",
+    bestTime: "Afternoon vitality tonic or pre-workout stamina builder",
     nutrition: {
       calories: "128 kcal",
       vitaminC: "140% RDA",
@@ -747,8 +745,7 @@ export const products: Product[] = [
       sugar: "Natural Fruit & Milk",
     },
     price: 60,
-    image:
-      "https://images.unsplash.com/photo-1553530666-ba11a7da3888?auto=format&fit=crop&w=900&q=85",
+    image: "/images/banana-papaya-mix.jpg",
     color: "#e8a838",
     hoverNote:
       "Bananas and sweet papaya blended with chilled milk. Nutritious, filling, and gentle on the gut.",
@@ -1824,7 +1821,10 @@ export default function Storefront() {
       pincode: pincodeInput.trim(),
       address: editCustomer.address.trim(),
     };
-    writeStorageValue(CUSTOMER_STORAGE_KEY, JSON.stringify(updatedCustomerProfile));
+    writeStorageValue(
+      CUSTOMER_STORAGE_KEY,
+      JSON.stringify(updatedCustomerProfile),
+    );
     setNameInput(editCustomer.name.trim());
     setPhoneInput(editCustomer.phone.trim());
     setAddressInput(editCustomer.address.trim());
@@ -1886,22 +1886,13 @@ export default function Storefront() {
             <Leaf size={20} aria-hidden="true" />
           </span>
           <span>JuiceWala</span>
-          <span className="sr-only">juicewala - juice wala - जूसवाला</span>
+          <span className="sr-only"></span>
         </a>
 
         <nav className="desktop-nav" aria-label="Main navigation">
           <a href="#juices">The Juices</a>
           <Link href="/standard-delivery">Standard Delivery</Link>
           <Link href="/purity-standard">Our Purity Standard</Link>
-          <Link
-            href="/contact"
-            onClick={(e) => {
-              e.preventDefault();
-              openSupport();
-            }}
-          >
-            Support
-          </Link>
         </nav>
 
         <div className="header-actions">
@@ -1955,10 +1946,10 @@ export default function Storefront() {
             <span className="hero-title-line">ताज़ा जूस।</span>
             <span className="hero-title-line">सीधा आपके घर।</span>
           </h1>
-          <p>अब जूस मंगाना हुआ आसान · JuiceWala (juicewala.shop)</p>
+          <p>अब जूस मंगाना हुआ आसान · JuiceWala</p>
           <p className="hero-copy">
             ताज़े फल और सब्जियों से बना जूस। बिना मिलावट और बिना पानी मिलाए,
-            सीधे आपके दरवाज़े तक। Order pure cold juices online from JuiceWala (juicewala / juice wala).
+            सीधे आपके दरवाज़े तक। Order pure cold juices online from JuiceWala.
           </p>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
             <a className="hero-cta" href="#juices">
@@ -2860,15 +2851,19 @@ export default function Storefront() {
             PAN-INDIA)
           </p>
           <h2>
-            Delivered fresh in safe packaging, <span>directly from seller to customer.</span>
+            Delivered fresh in safe packaging,{" "}
+            <span>directly from seller to customer.</span>
           </h2>
           <p>
-            At JuiceWala, we deliver not in bottles, but in safe packaging directly from seller to customer across Bhiwani.
-            Zero middlemen, hygienic food-grade tamper-evident packs, and guaranteed fresh taste.
+            At JuiceWala, we deliver not in bottles, but in safe packaging
+            directly from seller to customer across Bhiwani. Zero middlemen,
+            hygienic food-grade tamper-evident packs, and guaranteed fresh
+            taste.
           </p>
         </div>
         <Link href="/standard-delivery" className="text-link">
-          Read safe delivery promise & customer reviews <ChevronRight size={16} aria-hidden="true" />
+          Read safe delivery promise & customer reviews{" "}
+          <ChevronRight size={16} aria-hidden="true" />
         </Link>
       </section>
 
@@ -2912,10 +2907,12 @@ export default function Storefront() {
         </a>
         <div>
           <p>
-            JuiceWala (juicewala.shop / juice wala / जूसवाला) · 100% Raw Packed Juices Delivered Fresh in Bhiwani (Expanding Pan-India Soon).
+            JuiceWala · 100% Raw Packed Juices Delivered Fresh in Bhiwani
+            (Expanding Pan-India Soon).
           </p>
           <p style={{ marginTop: 4, fontSize: 11, color: "#a5b4a2" }}>
-            Official website: juicewala.shop · Order fresh juice online from JuiceWala (juicewala / juice wala).
+            Official website: juicewala.shop · Order fresh juice online from
+            JuiceWala.
           </p>
         </div>
         <Link href="/contact">Support & Inquiries</Link>
@@ -3057,8 +3054,8 @@ export default function Storefront() {
                       upon doorstep delivery.
                     </p>
                     <p className="payment-disclaimer">
-                      Payment is due on delivery. Juices are delivered in
-                      safe packaging.
+                      Payment is due on delivery. Juices are delivered in safe
+                      packaging.
                     </p>
                   </>
                 )}
@@ -3146,7 +3143,9 @@ export default function Storefront() {
                                 <span className="star-particle star-p3">★</span>
                                 <span className="star-particle star-p4">✦</span>
                                 <span className="star-particle star-p5">★</span>
-                                <span className="star-particle star-p6">✨</span>
+                                <span className="star-particle star-p6">
+                                  ✨
+                                </span>
                                 <span className="star-particle star-p7">★</span>
                                 <span className="star-particle star-p8">✦</span>
                               </span>
@@ -3187,9 +3186,7 @@ export default function Storefront() {
                 </p>
 
                 <form className="checkout-form" onSubmit={submitOrder}>
-                  <p className="eyebrow">
-                    WHERE SHOULD WE DELIVER YOUR JUICE?
-                  </p>
+                  <p className="eyebrow">WHERE SHOULD WE DELIVER YOUR JUICE?</p>
 
                   {hasAutoFilledDetails &&
                     Boolean(nameInput || phoneInput || addressInput) && (
@@ -3219,7 +3216,8 @@ export default function Storefront() {
                             style={{ color: "#2f7a40", flexShrink: 0 }}
                           />
                           <span>
-                            Address & details auto-filled from your previous order
+                            Address & details auto-filled from your previous
+                            order
                           </span>
                         </div>
                         <button
@@ -4186,14 +4184,30 @@ export default function Storefront() {
                                   className="star-burst-container"
                                   aria-hidden="true"
                                 >
-                                  <span className="star-particle star-p1">★</span>
-                                  <span className="star-particle star-p2">✦</span>
-                                  <span className="star-particle star-p3">★</span>
-                                  <span className="star-particle star-p4">✦</span>
-                                  <span className="star-particle star-p5">★</span>
-                                  <span className="star-particle star-p6">✨</span>
-                                  <span className="star-particle star-p7">★</span>
-                                  <span className="star-particle star-p8">✦</span>
+                                  <span className="star-particle star-p1">
+                                    ★
+                                  </span>
+                                  <span className="star-particle star-p2">
+                                    ✦
+                                  </span>
+                                  <span className="star-particle star-p3">
+                                    ★
+                                  </span>
+                                  <span className="star-particle star-p4">
+                                    ✦
+                                  </span>
+                                  <span className="star-particle star-p5">
+                                    ★
+                                  </span>
+                                  <span className="star-particle star-p6">
+                                    ✨
+                                  </span>
+                                  <span className="star-particle star-p7">
+                                    ★
+                                  </span>
+                                  <span className="star-particle star-p8">
+                                    ✦
+                                  </span>
                                 </span>
                               )}
                             </button>
@@ -4264,14 +4278,30 @@ export default function Storefront() {
                                   className="star-burst-container"
                                   aria-hidden="true"
                                 >
-                                  <span className="star-particle star-p1">★</span>
-                                  <span className="star-particle star-p2">✦</span>
-                                  <span className="star-particle star-p3">★</span>
-                                  <span className="star-particle star-p4">✦</span>
-                                  <span className="star-particle star-p5">★</span>
-                                  <span className="star-particle star-p6">✨</span>
-                                  <span className="star-particle star-p7">★</span>
-                                  <span className="star-particle star-p8">✦</span>
+                                  <span className="star-particle star-p1">
+                                    ★
+                                  </span>
+                                  <span className="star-particle star-p2">
+                                    ✦
+                                  </span>
+                                  <span className="star-particle star-p3">
+                                    ★
+                                  </span>
+                                  <span className="star-particle star-p4">
+                                    ✦
+                                  </span>
+                                  <span className="star-particle star-p5">
+                                    ★
+                                  </span>
+                                  <span className="star-particle star-p6">
+                                    ✨
+                                  </span>
+                                  <span className="star-particle star-p7">
+                                    ★
+                                  </span>
+                                  <span className="star-particle star-p8">
+                                    ✦
+                                  </span>
                                 </span>
                               )}
                             </button>
