@@ -1158,7 +1158,9 @@ export default function Storefront() {
     setError("");
 
     setCartToast((curr) => {
-      if (!curr || curr.product.id !== productId) return curr;
+      if (isCartOpen || !curr || curr.product.id !== productId) {
+        return isCartOpen ? null : curr;
+      }
       if (quantity <= 0) return null;
       return { ...curr, quantity };
     });
@@ -1186,11 +1188,12 @@ export default function Storefront() {
 
     const nextQty = (cart[product.id] ?? 0) + 1;
     changeQuantity(product.id, 1);
-    setCartToast({ product, quantity: nextQty });
+    if (!isCartOpen) {
+      setCartToast({ product, quantity: nextQty });
+    }
   }
 
   function handleUpdateBagQuantity(item: Product, delta: number) {
-    const nextQty = (cart[item.id] ?? 0) + delta;
     if (delta > 0) {
       const buttonKey = `bag-${item.id}`;
       setAnimatingButtonId(buttonKey);
@@ -1211,18 +1214,15 @@ export default function Storefront() {
     }
 
     changeQuantity(item.id, delta);
-
-    if (nextQty > 0) {
-      setCartToast({ product: item, quantity: nextQty });
-    } else {
-      setCartToast((curr) => (curr?.product.id === item.id ? null : curr));
-    }
+    // User is actively in the bag section, so do not pop up the "added to cart" toast
+    setCartToast(null);
   }
 
   function openCart() {
     setIsOrdersOpen(false);
     setOrder(null);
     setError("");
+    setCartToast(null);
     setIsCartOpen(true);
   }
 
@@ -2125,7 +2125,12 @@ export default function Storefront() {
         ) : (
           <div className="product-grid">
             {filteredProducts.map((product, index) => (
-              <article className="product-card" key={product.id}>
+              <article
+                className={`product-card ${
+                  animatingButtonId === product.id ? "card-animating-stars" : ""
+                }`}
+                key={product.id}
+              >
                 {/* Photo & Top Badges */}
                 <div
                   className="product-photo"
@@ -2958,7 +2963,14 @@ export default function Storefront() {
               <>
                 <div className="cart-items">
                   {cartItems.map((item) => (
-                    <div className="cart-item" key={item.id}>
+                    <div
+                      className={`cart-item ${
+                        animatingButtonId === `bag-${item.id}`
+                          ? "card-animating-stars"
+                          : ""
+                      }`}
+                      key={item.id}
+                    >
                       <div
                         className="cart-thumb"
                         style={{ backgroundImage: `url("${item.image}")` }}

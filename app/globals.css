@@ -438,11 +438,13 @@ textarea:focus-visible {
   gap: 17px;
 }
 .product-card {
-  overflow: hidden;
+  position: relative;
+  overflow: visible;
   border: 1px solid #e1e5dc;
   background: var(--white);
   border-radius: 5px;
   animation: content-arrive 0.5s both;
+  z-index: 1;
 }
 .product-card:nth-child(2) {
   animation-delay: 0.06s;
@@ -456,6 +458,7 @@ textarea:focus-visible {
   overflow: hidden;
   background-position: center;
   background-size: cover;
+  border-radius: 5px 5px 0 0;
 }
 .product-photo::after {
   position: absolute;
@@ -1535,9 +1538,11 @@ textarea:focus-visible {
   }
   .product-card {
     border-radius: 4px;
+    overflow: visible;
   }
   .product-photo {
     height: clamp(145px, 49vw, 230px);
+    border-radius: 4px 4px 0 0;
   }
   .product-details {
     padding: 12px 11px 10px;
@@ -1647,8 +1652,41 @@ textarea:focus-visible {
 
 /* Star burst animation on adding juice */
 .add-button,
+.quantity-control,
 .quantity-control button {
   position: relative;
+  overflow: visible;
+}
+
+.product-card.card-animating-stars,
+.product-card:has(.star-burst-container) {
+  z-index: 80 !important;
+}
+
+.product-actions {
+  position: relative;
+  overflow: visible;
+}
+
+.product-actions:has(.star-burst-container),
+.product-card.card-animating-stars .product-actions {
+  z-index: 90 !important;
+}
+
+.quantity-control button:has(.star-burst-container),
+.add-button:has(.star-burst-container),
+.button-star-bounce {
+  z-index: 100 !important;
+}
+
+.cart-item {
+  position: relative;
+  overflow: visible;
+}
+
+.cart-item.card-animating-stars,
+.cart-item:has(.star-burst-container) {
+  z-index: 50 !important;
 }
 
 .star-burst-container {
@@ -1658,7 +1696,7 @@ textarea:focus-visible {
   width: 0;
   height: 0;
   pointer-events: none;
-  z-index: 20;
+  z-index: 99999 !important;
 }
 
 .star-particle {
@@ -1670,6 +1708,7 @@ textarea:focus-visible {
   line-height: 1;
   user-select: none;
   pointer-events: none;
+  z-index: 99999 !important;
   animation-duration: 850ms;
   animation-timing-function: cubic-bezier(0.15, 0.85, 0.35, 1.2);
   animation-fill-mode: forwards;
